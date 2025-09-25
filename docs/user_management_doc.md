@@ -1,17 +1,3 @@
-**UserManagement bounded context**. Think of this as the handoff document a senior engineer would prepare so the whole team is aligned before implementation. It will include:  
-
-- Purpose & scope  
-- Constraints & guiding principles  
-- Requirements  
-- User stories  
-- User flows  
-- Domain model (UML)  
-- Database schema  
-- API endpoints (presentation layer)  
-- Responsibilities & module boundaries  
-
----
-
 # 📘 Documentation: UserManagement Bounded Context  
 
 ## 1. Purpose & Scope
