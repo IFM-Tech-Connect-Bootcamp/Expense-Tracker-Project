@@ -11,7 +11,7 @@ from .commands import (
     RegisterUserCommand,
     UpdateProfileCommand,
 )
-from .dtos import (
+from .dto import (
     AuthResultDTO,
     UserDTO,
 )

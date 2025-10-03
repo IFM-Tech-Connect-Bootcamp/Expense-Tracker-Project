@@ -24,8 +24,9 @@ class UserDTO:
         first_name: The user's first name
         last_name: The user's last name
         full_name: The user's full name (computed)
-        created_at: When the user was created
         status: The user's current status
+        created_at: When the user was created
+        updated_at: When the user was last updated
     """
     
     id: str
@@ -33,8 +34,9 @@ class UserDTO:
     first_name: str
     last_name: str
     full_name: str
-    created_at: datetime
     status: str
+    created_at: datetime
+    updated_at: datetime
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert DTO to dictionary representation.
@@ -48,8 +50,9 @@ class UserDTO:
             'first_name': self.first_name,
             'last_name': self.last_name,
             'full_name': self.full_name,
+            'status': self.status,
             'created_at': self.created_at.isoformat(),
-            'status': self.status
+            'updated_at': self.updated_at.isoformat()
         }
     
     @classmethod
@@ -65,6 +68,10 @@ class UserDTO:
         created_at = data['created_at']
         if isinstance(created_at, str):
             created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            
+        updated_at = data['updated_at']
+        if isinstance(updated_at, str):
+            updated_at = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
         
         return cls(
             id=data['id'],
@@ -72,8 +79,9 @@ class UserDTO:
             first_name=data['first_name'],
             last_name=data['last_name'],
             full_name=data['full_name'],
+            status=data['status'],
             created_at=created_at,
-            status=data['status']
+            updated_at=updated_at
         )
     
     def __str__(self) -> str:

@@ -20,17 +20,19 @@ user_management/application/
 │   └── deactivate_user.py     # User deactivation command
 ├── handlers/                   # Command handlers (use case orchestrators)
 │   ├── __init__.py            # Handler exports (CLEANED UP - no duplicate imports)
-│   ├── register_user.py       # Registration use case handler (ENHANCED)
-│   ├── authenticate_user.py   # Authentication use case handler (ENHANCED)
-│   ├── change_password.py     # Password change use case handler (ENHANCED)
-│   ├── update_profile.py      # Profile update use case handler (ENHANCED)
-│   └── deactivate_user.py     # Deactivation use case handler (ENHANCED)
-├── dto/                        # Data Transfer Objects (legacy structure)
-├── dtos.py                     # Data Transfer Objects (current)
+│   ├── register_user.py       # Registration use case handler 
+│   ├── authenticate_user.py   # Authentication use case handler 
+│   ├── change_password.py     # Password change use case handler 
+│   ├── update_profile.py      # Profile update use case handler 
+│   └── deactivate_user.py     # Deactivation use case handler 
+├── dto/                        # Data Transfer Objects (CONSOLIDATED)
+│   ├── __init__.py            # DTO exports
+│   ├── user_dto.py            # Enhanced User DTO with utility methods and full_name
+│   └── auth_dto.py            # Enhanced Authentication result DTO with utility methods
 ├── event_bus.py                # In-process event dispatching
 ├── errors.py                   # Application-specific exceptions
 ├── service.py                  # High-level service orchestration
-└── subscribers/                # Event subscribers (CLEANED UP)
+└── subscribers/                # Event subscribers
     ├── __init__.py            # Subscriber exports
     └── log_user_events.py     # Event audit logging (SIMPLIFIED - single generic handler)
 ```
@@ -154,17 +156,19 @@ user_management/application/
 
 ### Data Transfer Objects (DTOs)
 
-#### `UserDTO`
-- **Purpose**: External user representation
-- **Fields**: ID, email, first name, last name, status, timestamps
-- **Features**: Immutable, serializable, type-safe
+#### `UserDTO` (Enhanced)
+- **Purpose**: External user representation with enhanced features
+- **Fields**: ID, email, first name, last name, full name, status, created_at, updated_at
+- **Features**: Immutable, serializable, type-safe, utility methods (`to_dict()`, `from_dict()`)
 - **Usage**: API responses, inter-layer communication
+- **Enhancements**: Added `full_name` computed field and utility methods for serialization
 
-#### `AuthResultDTO`
-- **Purpose**: Authentication result encapsulation
-- **Fields**: User data, access token, token type, expiration
-- **Features**: Secure token handling, comprehensive auth data
+#### `AuthResultDTO` (Enhanced)
+- **Purpose**: Authentication result encapsulation with enhanced features
+- **Fields**: User data, access token, token type, expiration time
+- **Features**: Secure token handling, comprehensive auth data, utility methods
 - **Usage**: Login responses, session management
+- **Enhancements**: Added utility methods (`to_dict()`, `from_dict()`) and improved string representations
 
 ### Event System
 

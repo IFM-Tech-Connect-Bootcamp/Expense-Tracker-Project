@@ -13,7 +13,7 @@ from ...domain.value_objects.first_name import FirstName
 from ...domain.value_objects.last_name import LastName
 from ...domain.value_objects.user_id import UserId
 from ..commands.update_profile import UpdateProfileCommand
-from ..dtos import UserDTO
+from ..dto import UserDTO
 from ..errors import translate_domain_error
 
 if TYPE_CHECKING:
@@ -99,6 +99,7 @@ class UpdateProfileHandler:
                 email=user.email.value,
                 first_name=user.first_name.value,
                 last_name=user.last_name.value,
+                full_name=f"{user.first_name.value} {user.last_name.value}",
                 status=user.status.value,
                 created_at=user.created_at,
                 updated_at=user.updated_at

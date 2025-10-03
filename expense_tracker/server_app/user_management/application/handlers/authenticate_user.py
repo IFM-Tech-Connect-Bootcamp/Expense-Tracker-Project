@@ -13,7 +13,7 @@ from ...domain.errors import UserManagementDomainError
 from ...domain.repositories.user_repository import UserRepository
 from ...domain.value_objects.email import Email
 from ..commands.authenticate_user import AuthenticateUserCommand
-from ..dtos import AuthResultDTO, UserDTO
+from ..dto import AuthResultDTO, UserDTO
 from ..errors import translate_domain_error
 
 if TYPE_CHECKING:
@@ -113,6 +113,7 @@ class AuthenticateUserHandler:
                 email=user.email.value,
                 first_name=user.first_name.value,
                 last_name=user.last_name.value,
+                full_name=f"{user.first_name.value} {user.last_name.value}",
                 status=user.status.value,
                 created_at=user.created_at,
                 updated_at=user.updated_at

@@ -17,7 +17,7 @@ from .commands import (
     RegisterUserCommand,
     UpdateProfileCommand,
 )
-from .dtos import AuthResultDTO, UserDTO
+from .dto import AuthResultDTO, UserDTO
 from .errors import ApplicationError
 from .event_bus import EventBus
 from .handlers import (

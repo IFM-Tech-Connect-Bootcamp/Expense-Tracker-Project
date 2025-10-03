@@ -20,7 +20,7 @@ from ...domain.value_objects.password_hash import PasswordHash
 from ...domain.value_objects.user_id import UserId
 from ..commands.register_user import RegisterUserCommand
 from ..errors import ApplicationError
-from ..dtos import UserDTO
+from ..dto import UserDTO
 from ..errors import translate_domain_error
 
 if TYPE_CHECKING:
@@ -131,6 +131,7 @@ class RegisterUserHandler:
                 email=user.email.value,
                 first_name=user.first_name.value,
                 last_name=user.last_name.value,
+                full_name=f"{user.first_name.value} {user.last_name.value}",
                 status=user.status.value,
                 created_at=user.created_at,
                 updated_at=user.updated_at
