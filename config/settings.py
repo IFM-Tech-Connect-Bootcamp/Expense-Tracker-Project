@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-k-%6r)3jh_ge&)^le#@mk3h5i1uj-u)7(m^rw#niz(ww*x21b^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
 
 
 # Application definition
@@ -45,6 +45,7 @@ THIRD_PARTY_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'drf_spectacular',
+    'drf_spectacular_sidecar',
 ]
 
 # Local apps (bounded contexts)
@@ -146,7 +147,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Additional directories to search for static files
+STATICFILES_DIRS = []
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -215,6 +220,9 @@ SPECTACULAR_SETTINGS = {
     'DEFAULT_GENERATOR_CLASS': 'drf_spectacular.generators.SchemaGenerator',
     'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
     'SERVE_AUTHENTICATION': [],
+    'SWAGGER_UI_DIST': 'SIDECAR',  # Use bundled UI files
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',  # Use bundled Redoc files
     'SWAGGER_UI_SETTINGS': {
         'deepLinking': True,
         'persistAuthorization': True,
@@ -222,6 +230,8 @@ SPECTACULAR_SETTINGS = {
         'displayRequestDuration': True,
         'filter': True,
         'tryItOutEnabled': True,
+        'supportedSubmitMethods': ['get', 'post', 'put', 'delete', 'patch'],
+        'docExpansion': 'list',
     },
     'REDOC_UI_SETTINGS': {
         'hideDownloadButton': False,

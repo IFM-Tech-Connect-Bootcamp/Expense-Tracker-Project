@@ -68,3 +68,19 @@ urlpatterns = [
     # API v1 - Bounded context URLs
     path('api/v1/users/', include('user_management.presentation.urls')),
 ]
+
+# Add sidecar static files serving for Swagger UI assets in development
+from django.conf import settings
+if settings.DEBUG:
+    try:
+        from drf_spectacular_sidecar import urls as sidecar_urls
+        urlpatterns += [
+            path('api/docs/', include(sidecar_urls)),
+        ]
+    except ImportError:
+        # Sidecar not installed, fallback to CDN
+        pass
+    
+    # Serve static files during development
+    from django.conf.urls.static import static
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

@@ -21,6 +21,7 @@ isort==6.1.0
 
 # API and HTTP
 djangorestframework==3.15.2
+drf-spectacular[sidecar]==0.27.2
 requests==2.32.3
 
 # Environment management
