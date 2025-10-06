@@ -50,6 +50,7 @@ from ..application.commands import (
 )
 from ..application.dto import UserDTO, AuthResultDTO
 from ..infrastructure.container import InfrastructureContainer
+from ..infrastructure.outbox.writer import write_domain_event
 from ..domain.repositories.user_repository import UserRepository
 from ..domain.services.password_policy import PasswordHasher, TokenProvider
 from ..domain.errors import (
@@ -96,6 +97,24 @@ def _handle_async_handler(async_func, *args, **kwargs):
     except Exception as e:
         logger.error(f"Error in async handler execution: {str(e)}", exc_info=True)
         raise
+
+
+async def _publish_domain_events(events):
+    """
+    Publish domain events to the outbox for reliable delivery.
+    
+    Args:
+        events: List of domain events to publish
+    """
+    try:
+        logger.info(f"Publishing {len(events)} domain events to outbox")
+        for event in events:
+            logger.debug(f"Publishing event: {event.__class__.__name__}")
+            await write_domain_event(event, use_transaction_commit=False)
+        logger.info(f"Successfully published {len(events)} domain events to outbox")
+    except Exception as e:
+        logger.error(f"Failed to publish domain events: {str(e)}", exc_info=True)
+        # Don't raise - event publishing failure shouldn't break the main flow
 
 
 def _handle_domain_errors(error: Exception) -> Response:
@@ -237,6 +256,10 @@ def register_user(request: Request) -> Response:
         
         user_result = _handle_async_handler(handler.handle, register_command)
         user_dto = user_result.user_dto
+        
+        # Publish domain events to outbox
+        if hasattr(user_result, 'events') and user_result.events:
+            _handle_async_handler(_publish_domain_events, user_result.events)
         
         # Return response
         user_data = _create_user_response_data(user_dto)
@@ -445,51 +468,21 @@ def update_profile(request: Request) -> Response:
             new_last_name=serializer.validated_data.get('last_name'),
         )
         
-        # Execute use case - Simplified version for testing
-        try:
-            # Update the user directly using the repository
-            if serializer.validated_data.get('first_name'):
-                from ..domain.value_objects.first_name import FirstName
-                current_user.first_name = FirstName(serializer.validated_data['first_name'])
-            
-            if serializer.validated_data.get('last_name'):
-                from ..domain.value_objects.last_name import LastName
-                current_user.last_name = LastName(serializer.validated_data['last_name'])
-            
-            # Update timestamp
-            from django.utils import timezone
-            current_user.updated_at = timezone.now()
-            
-            # Save using repository update method with async handler
-            container = InfrastructureContainer()
-            user_repository = container.get(UserRepository)
-            
-            async def update_user():
-                return await user_repository.update(current_user)
-            
-            updated_user = _handle_async_handler(update_user)
-            
-            # Create user DTO for response
-            from ..application.dto import UserDTO
-            user_dto = UserDTO(
-                id=str(updated_user.id.value),
-                email=updated_user.email.value,
-                first_name=updated_user.first_name.value,
-                last_name=updated_user.last_name.value,
-                full_name=f"{updated_user.first_name.value} {updated_user.last_name.value}",
-                status=updated_user.status.value,
-                created_at=updated_user.created_at,
-                updated_at=updated_user.updated_at
-            )
-            
-            # Return response
-            user_data = _create_user_response_data(user_dto)
-            return Response(user_data, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            logger.error(f"Direct update failed: {str(e)}")
-            # Fall back to original handler approach
-            pass
+        # Execute use case using proper handler
+        container = InfrastructureContainer()
+        handler = UpdateProfileHandler(
+            user_repository=container.get(UserRepository),
+        )
+        
+        update_result = _handle_async_handler(handler.handle, update_command)
+        
+        # Publish domain events to outbox
+        if hasattr(update_result, 'events') and update_result.events:
+            _handle_async_handler(_publish_domain_events, update_result.events)
+        
+        # Return response
+        user_data = _create_user_response_data(update_result.user_dto)
+        return Response(user_data, status=status.HTTP_200_OK)
         
     except (UserNotFoundError, UserAlreadyExistsError, DomainValidationError) as e:
         return _handle_domain_errors(e)
@@ -561,7 +554,11 @@ def change_password(request: Request) -> Response:
             password_service=container.get(PasswordHasher),
         )
         
-        _handle_async_handler(handler.handle, change_password_command)
+        change_result = _handle_async_handler(handler.handle, change_password_command)
+        
+        # Publish domain events to outbox
+        if hasattr(change_result, 'events') and change_result.events:
+            _handle_async_handler(_publish_domain_events, change_result.events)
         
         # Return success response
         return Response(
@@ -637,7 +634,10 @@ def deactivate_user(request: Request) -> Response:
             user_repository=container.get(UserRepository),
         )
         
-        _handle_async_handler(handler.handle, deactivate_command)
+        deactivate_result = _handle_async_handler(handler.handle, deactivate_command)
+        
+        # Publish domain events
+        _handle_async_handler(_publish_domain_events, deactivate_result.events)
         
         # Return success response
         return Response(
