@@ -49,7 +49,7 @@ class UpdateProfileHandler:
         """
         self._user_repository = user_repository
     
-    async def handle(self, command: UpdateProfileCommand) -> UpdateProfileResult:
+    def handle(self, command: UpdateProfileCommand) -> UpdateProfileResult:
         """Execute the profile update use case.
         
         Args:
@@ -70,7 +70,7 @@ class UpdateProfileHandler:
             
             # Step 2: Find user by ID
             logger.debug(f"Finding user by ID: {command.user_id}")
-            user = await self._user_repository.find_by_id(user_id)
+            user = self._user_repository.find_by_id(user_id)
             if user is None:
                 logger.warning(f"Profile update failed: User not found: {command.user_id}")
                 from ...domain.errors import UserNotFoundError
@@ -97,7 +97,7 @@ class UpdateProfileHandler:
             
             # Step 5: Persist the updated user
             logger.debug(f"Persisting updated user: {command.user_id}")
-            await self._user_repository.update(user)
+            self._user_repository.update(user)
             
             # Step 6: Create user DTO for response
             logger.debug(f"Creating user DTO for successful profile update of user: {command.user_id}")

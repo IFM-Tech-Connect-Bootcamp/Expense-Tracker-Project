@@ -39,7 +39,7 @@ class BcryptPasswordHasher(PasswordHasher):
         self._hasher = bcrypt.using(rounds=rounds)
         logger.debug(f"Initialized BcryptPasswordHasher with {rounds} rounds")
 
-    async def hash_password(self, password: str) -> str:
+    def hash_password(self, password: str) -> str:
         """Hash a plain text password using bcrypt.
         
         Args:
@@ -65,7 +65,7 @@ class BcryptPasswordHasher(PasswordHasher):
             logger.error(f"Failed to hash password: {e}")
             raise ValueError(f"Password hashing failed: {e}") from e
 
-    async def verify_password(self, password: str, hashed: str) -> bool:
+    def verify_password(self, password: str, hashed: str) -> bool:
         """Verify a password against its hash.
         
         Args:
@@ -128,7 +128,7 @@ class BcryptPasswordHasher(PasswordHasher):
         return self._rounds
 
     # Domain interface methods
-    async def hash(self, plain_password: str) -> PasswordHash:
+    def hash(self, plain_password: str) -> PasswordHash:
         """Hash a plain text password (domain interface).
         
         Args:
@@ -140,10 +140,10 @@ class BcryptPasswordHasher(PasswordHasher):
         Raises:
             ValueError: If password is empty or hashing fails.
         """
-        hashed_str = await self.hash_password(plain_password)
+        hashed_str = self.hash_password(plain_password)
         return PasswordHash(hashed_str)
 
-    async def verify(self, password_hash: PasswordHash, plain_password: str) -> bool:
+    def verify(self, password_hash: PasswordHash, plain_password: str) -> bool:
         """Verify a password against hash (domain interface).
         
         Args:
@@ -153,11 +153,11 @@ class BcryptPasswordHasher(PasswordHasher):
         Returns:
             True if password matches hash, False otherwise.
         """
-        return await self.verify_password(plain_password, password_hash.value)
+        return self.verify_password(plain_password, password_hash.value)
 
 
-class AsyncPasswordService:
-    """Async wrapper for password operations.
+class PasswordService:
+    """Synchronous password service for password operations.
     
     Provides the PasswordService protocol implementation
     used by application layer handlers.
@@ -171,8 +171,8 @@ class AsyncPasswordService:
         """
         self._hasher = hasher or BcryptPasswordHasher()
 
-    async def hash_password(self, password: str) -> str:
-        """Hash a password asynchronously.
+    def hash_password(self, password: str) -> str:
+        """Hash a password synchronously.
         
         Args:
             password: Plain text password.
@@ -180,10 +180,10 @@ class AsyncPasswordService:
         Returns:
             Hashed password string.
         """
-        return await self._hasher.hash_password(password)
+        return self._hasher.hash_password(password)
 
-    async def verify_password(self, password: str, hashed: str) -> bool:
-        """Verify a password asynchronously.
+    def verify_password(self, password: str, hashed: str) -> bool:
+        """Verify a password synchronously.
         
         Args:
             password: Plain text password.
@@ -192,7 +192,7 @@ class AsyncPasswordService:
         Returns:
             True if password is valid, False otherwise.
         """
-        return await self._hasher.verify_password(password, hashed)
+        return self._hasher.verify_password(password, hashed)
 
     def needs_rehash(self, hashed: str) -> bool:
         """Check if hash needs upgrading.
@@ -207,7 +207,7 @@ class AsyncPasswordService:
 
 
 # Factory function for dependency injection
-def create_password_service(rounds: int = 12) -> AsyncPasswordService:
+def create_password_service(rounds: int = 12) -> PasswordService:
     """Create a password service with specified bcrypt rounds.
     
     Args:
@@ -217,4 +217,4 @@ def create_password_service(rounds: int = 12) -> AsyncPasswordService:
         Configured password service instance.
     """
     hasher = BcryptPasswordHasher(rounds=rounds)
-    return AsyncPasswordService(hasher)
+    return PasswordService(hasher)

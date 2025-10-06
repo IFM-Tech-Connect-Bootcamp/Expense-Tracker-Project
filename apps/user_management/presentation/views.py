@@ -15,12 +15,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.conf import settings
 from drf_spectacular.utils import extend_schema, OpenApiResponse
-from asgiref.sync import sync_to_async, async_to_sync
 from django.http import JsonResponse
-import asyncio
 import logging
 from typing import Dict, Any
-import logging
 
 from .serializers import (
     RegisterUserSerializer,
@@ -77,29 +74,7 @@ from ..application.errors import (
 logger = logging.getLogger(__name__)
 
 
-def _handle_async_handler(async_func, *args, **kwargs):
-    """
-    Handle async operations safely in Django synchronous views.
-    
-    This function creates a new event loop to execute async handlers,
-    ensuring proper isolation and cleanup. It should be used sparingly
-    for each call, avoiding conflicts with existing event loops.
-    """
-    try:
-        # Create a new event loop for this execution
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(async_func(*args, **kwargs))
-            return result
-        finally:
-            loop.close()
-    except Exception as e:
-        logger.error(f"Error in async handler execution: {str(e)}", exc_info=True)
-        raise
-
-
-async def _publish_domain_events(events):
+def _publish_domain_events(events):
     """
     Publish domain events to the outbox for reliable delivery.
     
@@ -110,7 +85,7 @@ async def _publish_domain_events(events):
         logger.info(f"Publishing {len(events)} domain events to outbox")
         for event in events:
             logger.debug(f"Publishing event: {event.__class__.__name__}")
-            await write_domain_event(event, use_transaction_commit=False)
+            write_domain_event(event, use_transaction_commit=False)
         logger.info(f"Successfully published {len(events)} domain events to outbox")
     except Exception as e:
         logger.error(f"Failed to publish domain events: {str(e)}", exc_info=True)
@@ -254,12 +229,12 @@ def register_user(request: Request) -> Response:
             password_service=container.get(PasswordHasher),
         )
         
-        user_result = _handle_async_handler(handler.handle, register_command)
+        user_result = handler.handle(register_command)
         user_dto = user_result.user_dto
         
         # Publish domain events to outbox
         if hasattr(user_result, 'events') and user_result.events:
-            _handle_async_handler(_publish_domain_events, user_result.events)
+            _publish_domain_events(user_result.events)
         
         # Return response
         user_data = _create_user_response_data(user_dto)
@@ -329,7 +304,7 @@ def authenticate_user(request: Request) -> Response:
             token_provider=container.get(TokenProvider),
         )
         
-        auth_result = _handle_async_handler(handler.handle, auth_command)
+        auth_result = handler.handle(auth_command)
         
         # Return response
         user_data = _create_user_response_data(auth_result.user)
@@ -474,11 +449,11 @@ def update_profile(request: Request) -> Response:
             user_repository=container.get(UserRepository),
         )
         
-        update_result = _handle_async_handler(handler.handle, update_command)
+        update_result = handler.handle(update_command)
         
         # Publish domain events to outbox
         if hasattr(update_result, 'events') and update_result.events:
-            _handle_async_handler(_publish_domain_events, update_result.events)
+            _publish_domain_events(update_result.events)
         
         # Return response
         user_data = _create_user_response_data(update_result.user_dto)
@@ -554,11 +529,11 @@ def change_password(request: Request) -> Response:
             password_service=container.get(PasswordHasher),
         )
         
-        change_result = _handle_async_handler(handler.handle, change_password_command)
+        change_result = handler.handle(change_password_command)
         
         # Publish domain events to outbox
         if hasattr(change_result, 'events') and change_result.events:
-            _handle_async_handler(_publish_domain_events, change_result.events)
+            _publish_domain_events(change_result.events)
         
         # Return success response
         return Response(
@@ -634,10 +609,10 @@ def deactivate_user(request: Request) -> Response:
             user_repository=container.get(UserRepository),
         )
         
-        deactivate_result = _handle_async_handler(handler.handle, deactivate_command)
+        deactivate_result = handler.handle(deactivate_command)
         
         # Publish domain events
-        _handle_async_handler(_publish_domain_events, deactivate_result.events)
+        _publish_domain_events(deactivate_result.events)
         
         # Return success response
         return Response(

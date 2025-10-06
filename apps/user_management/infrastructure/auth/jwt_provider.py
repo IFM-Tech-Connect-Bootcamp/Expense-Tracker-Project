@@ -62,7 +62,7 @@ class JWTTokenProvider(TokenProvider):
             f"expiry={expiry_minutes}min, issuer={issuer}"
         )
 
-    async def issue_token(self, user_id: UserId, claims: Optional[Dict[str, Any]] = None) -> str:
+    def issue_token(self, user_id: UserId, claims: Optional[Dict[str, Any]] = None) -> str:
         """Issue a JWT token for the specified user.
         
         Args:
@@ -110,7 +110,7 @@ class JWTTokenProvider(TokenProvider):
             logger.error(f"Failed to issue JWT token for user {user_id.value}: {e}")
             raise ValueError(f"Token generation failed: {e}") from e
 
-    async def verify_token(self, token: str) -> UserId:
+    def verify_token(self, token: str) -> UserId:
         """Verify a JWT token and extract user ID.
         
         Args:
@@ -172,7 +172,7 @@ class JWTTokenProvider(TokenProvider):
             logger.error(f"JWT token verification failed: {e}")
             raise ValueError(f"Token verification failed: {e}") from e
 
-    async def refresh_token(self, token: str) -> str:
+    def refresh_token(self, token: str) -> str:
         """Refresh a JWT token with new expiration.
         
         Args:
@@ -216,7 +216,7 @@ class JWTTokenProvider(TokenProvider):
             }
             
             # Issue new token
-            new_token = await self.issue_token(user_id, custom_claims)
+            new_token = self.issue_token(user_id, custom_claims)
             
             logger.debug(f"Successfully refreshed JWT token for user: {user_id.value}")
             return new_token

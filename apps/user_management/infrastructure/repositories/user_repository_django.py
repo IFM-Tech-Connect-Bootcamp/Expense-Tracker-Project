@@ -37,7 +37,7 @@ class DjangoUserRepository(UserRepository):
     Translates database errors to domain errors.
     """
 
-    async def find_by_id(self, user_id: UserId) -> Optional[User]:
+    def find_by_id(self, user_id: UserId) -> Optional[User]:
         """Find user by ID.
         
         Args:
@@ -52,7 +52,7 @@ class DjangoUserRepository(UserRepository):
         logger.debug(f"Finding user by ID: {user_id.value}")
         
         try:
-            model = await UserModel.objects.aget(id=user_id.value)
+            model = UserModel.objects.get(id=user_id.value)
             validate_model_data(model)
             user = model_to_entity(model)
             logger.debug(f"Found user: {user.id.value}")
@@ -64,7 +64,7 @@ class DjangoUserRepository(UserRepository):
             logger.error(f"Error finding user by ID {user_id.value}: {e}")
             raise ValueError(f"Failed to find user: {e}") from e
 
-    async def find_by_email(self, email: Email) -> Optional[User]:
+    def find_by_email(self, email: Email) -> Optional[User]:
         """Find user by email address.
         
         Args:
@@ -79,7 +79,7 @@ class DjangoUserRepository(UserRepository):
         logger.debug(f"Finding user by email: {email.value}")
         
         try:
-            model = await UserModel.objects.filter(email=email.value).afirst()
+            model = UserModel.objects.filter(email=email.value).first()
             if model:
                 user = model_to_entity(model)
                 logger.debug(f"Found user: {user.id.value}")
@@ -92,7 +92,7 @@ class DjangoUserRepository(UserRepository):
             logger.error(f"Error finding user by email {email.value}: {e}")
             raise
 
-    async def find_active_by_email(self, email: Email) -> Optional[User]:
+    def find_active_by_email(self, email: Email) -> Optional[User]:
         """Find active user by email address.
         
         Args:
@@ -107,10 +107,10 @@ class DjangoUserRepository(UserRepository):
         logger.debug(f"Finding active user by email: {email.value}")
         
         try:
-            model = await UserModel.objects.filter(
+            model = UserModel.objects.filter(
                 email=email.value, 
-                is_active=True
-            ).afirst()
+                status="active"
+            ).first()
             if model:
                 user = model_to_entity(model)
                 logger.debug(f"Found active user: {user.id.value}")
@@ -123,7 +123,7 @@ class DjangoUserRepository(UserRepository):
             logger.error(f"Error finding active user by email {email.value}: {e}")
             raise
 
-    async def exists_by_email(self, email: Email) -> bool:
+    def exists_by_email(self, email: Email) -> bool:
         """Check if user exists by email address.
         
         Args:
@@ -135,14 +135,14 @@ class DjangoUserRepository(UserRepository):
         logger.debug(f"Checking if user exists by email: {email.value}")
         
         try:
-            exists = await UserModel.objects.filter(email=email.value).aexists()
+            exists = UserModel.objects.filter(email=email.value).exists()
             logger.debug(f"User exists: {exists}")
             return exists
         except Exception as e:
             logger.error(f"Error checking user existence by email {email.value}: {e}")
             raise ValueError(f"Failed to check user existence: {e}") from e
 
-    async def save(self, user: User) -> User:
+    def save(self, user: User) -> User:
         """Save new user to database.
         
         Args:
@@ -159,13 +159,13 @@ class DjangoUserRepository(UserRepository):
         
         try:
             # Check if user already exists
-            if await self.exists_by_email(user.email):
+            if self.exists_by_email(user.email):
                 raise UserAlreadyExistsError(f"User with email {user.email.value} already exists")
             
             # Create new model
             model_data = entity_to_model_data(user)
             
-            model = await UserModel.objects.acreate(**model_data)
+            model = UserModel.objects.create(**model_data)
             logger.info(f"User saved with ID: {model.id}")
             
             # Convert back to entity and return
@@ -181,7 +181,7 @@ class DjangoUserRepository(UserRepository):
             logger.error(f"Error saving user {user.email.value}: {e}")
             raise
 
-    async def update(self, user: User) -> User:
+    def update(self, user: User) -> User:
         """Update existing user entity in database.
         
         Args:
@@ -200,7 +200,7 @@ class DjangoUserRepository(UserRepository):
         try:
             # Get existing model
             try:
-                existing_model = await UserModel.objects.aget(id=user.id.value)
+                existing_model = UserModel.objects.get(id=user.id.value)
             except ObjectDoesNotExist:
                 logger.warning(f"User not found for update: {user.id.value}")
                 raise UserNotFoundError(str(user.id.value))
@@ -208,7 +208,7 @@ class DjangoUserRepository(UserRepository):
             # Update model with new data
             try:
                 updated_model = update_model_from_entity(existing_model, user)
-                await updated_model.asave()
+                updated_model.save()
             except IntegrityError as e:
                 if 'email' in str(e).lower():
                     logger.warning(f"Email already exists during update: {user.email.value}")
@@ -228,7 +228,7 @@ class DjangoUserRepository(UserRepository):
             logger.error(f"Error updating user {user.id.value}: {e}")
             raise ValueError(f"Failed to update user: {e}") from e
 
-    async def delete(self, user_id: UserId) -> None:
+    def delete(self, user_id: UserId) -> None:
         """Delete user from database.
         
         Args:
@@ -242,8 +242,8 @@ class DjangoUserRepository(UserRepository):
         
         try:
             try:
-                model = await UserModel.objects.aget(id=user_id.value)
-                await model.adelete()
+                model = UserModel.objects.get(id=user_id.value)
+                model.delete()
             except ObjectDoesNotExist:
                 logger.warning(f"User not found for deletion: {user_id.value}")
                 raise UserNotFoundError(str(user_id.value))
@@ -256,7 +256,7 @@ class DjangoUserRepository(UserRepository):
             logger.error(f"Error deleting user {user_id.value}: {e}")
             raise ValueError(f"Failed to delete user: {e}") from e
 
-    async def find_active_users(self, limit: int = 100, offset: int = 0) -> list[User]:
+    def find_active_users(self, limit: int = 100, offset: int = 0) -> list[User]:
         """Find active users with pagination.
         
         Args:
@@ -275,7 +275,7 @@ class DjangoUserRepository(UserRepository):
             models = UserModel.objects.filter(status='active')[offset:offset + limit]
             users = []
             
-            async for model in models:
+            for model in models:
                 validate_model_data(model)
                 user = model_to_entity(model)
                 users.append(user)
@@ -287,7 +287,7 @@ class DjangoUserRepository(UserRepository):
             logger.error(f"Error finding active users: {e}")
             raise ValueError(f"Failed to find active users: {e}") from e
 
-    async def count_active_users(self) -> int:
+    def count_active_users(self) -> int:
         """Count active users in the system.
         
         Returns:
@@ -299,7 +299,7 @@ class DjangoUserRepository(UserRepository):
         logger.debug("Counting active users")
         
         try:
-            count = await UserModel.objects.filter(is_active=True).acount()
+            count = UserModel.objects.filter(status="active").count()
             logger.debug(f"Found {count} active users")
             return count
             
@@ -307,7 +307,7 @@ class DjangoUserRepository(UserRepository):
             logger.error(f"Error counting active users: {e}")
             raise ValueError(f"Database error: {e}")
 
-    async def count_users(self) -> int:
+    def count_users(self) -> int:
         """Count all users in the system.
         
         Returns:
@@ -319,7 +319,7 @@ class DjangoUserRepository(UserRepository):
         logger.debug("Counting all users")
         
         try:
-            count = await UserModel.objects.acount()
+            count = UserModel.objects.count()
             logger.debug(f"Found {count} total users")
             return count
             

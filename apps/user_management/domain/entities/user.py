@@ -204,7 +204,7 @@ class User:
     
     
     
-    async def verify_password(self, plain_password: str, password_hasher: PasswordHasher) -> bool:
+    def verify_password(self, plain_password: str, password_hasher: PasswordHasher) -> bool:
         """Verify a plain text password against the stored hash.
         
         Args:
@@ -223,14 +223,14 @@ class User:
                 "Cannot verify password for an inactive user"
             )
         
-        return await password_hasher.verify(self.password_hash, plain_password)
+        return password_hasher.verify(self.password_hash, plain_password)
     
     
     
     
     
     
-    async def change_password(
+    def change_password(
         self, 
         old_password: str, 
         new_password: str, 
@@ -254,14 +254,14 @@ class User:
             )
         
         # Verify old password
-        if not await password_hasher.verify(self.password_hash, old_password):
+        if not password_hasher.verify(self.password_hash, old_password):
             raise InvalidOperationError(
                 "change_password",
                 "Current password is incorrect"
             )
         
         # Hash the new password (this will validate policy via the hasher)
-        self.password_hash = await password_hasher.hash(new_password)
+        self.password_hash = password_hasher.hash(new_password)
         self.updated_at = timezone.now()
         
         # Publish event

@@ -112,34 +112,6 @@ class JWTAuthentication(BaseAuthentication):
             logger.error(f"Unexpected authentication error: {str(e)}")
             raise AuthenticationFailed("Authentication failed")
 
-    async def authenticate_async(self, request: Request) -> Optional[Tuple[UserProxy, str]]:
-        """
-        Async version of authenticate for async views.
-        
-        Args:
-            request: The HTTP request object
-            
-        Returns:
-            Tuple of (user, token) if authentication successful, None otherwise
-        """
-        header = self.get_authorization_header(request)
-        if not header:
-            return None
-            
-        try:
-            token = self.get_token_from_header(header)
-            if not token:
-                return None
-                
-            return await self._authenticate_token_async(token)
-            
-        except ValueError as e:
-            logger.warning(f"Async authentication failed: {str(e)}")
-            raise AuthenticationFailed(f"Invalid token: {str(e)}")
-        except Exception as e:
-            logger.error(f"Unexpected async authentication error: {str(e)}")
-            raise AuthenticationFailed("Authentication failed")
-
     def get_authorization_header(self, request: Request) -> Optional[bytes]:
         """
         Extract authorization header from request.
@@ -198,66 +170,15 @@ class JWTAuthentication(BaseAuthentication):
         Raises:
             AuthenticationFailed: If token is invalid or user not found
         """
-        try:
-            import asyncio
-            from asgiref.sync import sync_to_async
-            
-            # Run the async authentication in the sync context
-            # This is needed because DRF authentication is synchronous
-            async def async_auth():
-                return await self._authenticate_token_async(token)
-            
-            # Get or create event loop and run the async authentication
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If we're already in an event loop, we need to use a different approach
-                    # Create a new thread with its own event loop
-                    import concurrent.futures
-                    import threading
-                    
-                    def run_in_new_loop():
-                        new_loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(new_loop)
-                        try:
-                            return new_loop.run_until_complete(async_auth())
-                        finally:
-                            new_loop.close()
-                    
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(run_in_new_loop)
-                        return future.result(timeout=10)  # 10 second timeout
-                else:
-                    return loop.run_until_complete(async_auth())
-            except RuntimeError:
-                # No event loop, create one
-                return asyncio.run(async_auth())
-                
-        except Exception as e:
-            raise AuthenticationFailed(f"Authentication failed: {str(e)}")
-
-    async def _authenticate_token_async(self, token: str) -> Tuple[UserProxy, str]:
-        """
-        Authenticate token and return user (async version).
-        
-        Args:
-            token: JWT token string
-            
-        Returns:
-            Tuple of (UserProxy, token)
-            
-        Raises:
-            AuthenticationFailed: If token is invalid or user not found
-        """
         # Verify the JWT token and get user ID
         try:
-            user_id = await self.token_provider.verify_token(token)
+            user_id = self.token_provider.verify_token(token)
         except Exception as e:
             raise AuthenticationFailed(f"Token verification failed: {str(e)}")
         
         # Get user from repository
         try:
-            user = await self.user_repository.find_by_id(user_id)
+            user = self.user_repository.find_by_id(user_id)
             if not user:
                 raise AuthenticationFailed("User not found")
             

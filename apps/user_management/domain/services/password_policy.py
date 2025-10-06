@@ -42,7 +42,7 @@ class PasswordHasher(Protocol):
     The implementation should use a secure hashing algorithm like bcrypt.
     """
     
-    async def hash(self, plain_password: str) -> PasswordHash:
+    def hash(self, plain_password: str) -> PasswordHash:
         """Hash a plain text password.
         
         Args:
@@ -56,7 +56,7 @@ class PasswordHasher(Protocol):
         """
         ...
     
-    async def verify(self, password_hash: PasswordHash, plain_password: str) -> bool:
+    def verify(self, password_hash: PasswordHash, plain_password: str) -> bool:
         """Verify a plain text password against a hash.
         
         Args:
@@ -80,7 +80,7 @@ class TokenProvider(Protocol):
     authentication tokens used for user sessions.
     """
     
-    async def issue_token(self, user_id: UserId, claims: dict[str, str] | None = None) -> str:
+    def issue_token(self, user_id: UserId, claims: dict[str, str] | None = None) -> str:
         """Issue a JWT token for a user.
         
         Args:
@@ -95,7 +95,7 @@ class TokenProvider(Protocol):
         """
         ...
     
-    async def verify_token(self, token: str) -> UserId:
+    def verify_token(self, token: str) -> UserId:
         """Verify a JWT token and extract the user ID.
         
         Args:

@@ -74,7 +74,7 @@ class RegisterUserHandler:
         self._user_repository = user_repository
         self._password_service = password_service
     
-    async def handle(self, command: RegisterUserCommand) -> RegisterUserResult:
+    def handle(self, command: RegisterUserCommand) -> RegisterUserResult:
         """Execute the user registration use case.
         
         Args:
@@ -99,7 +99,7 @@ class RegisterUserHandler:
             
             # Step 2: Check if user already exists
             logger.debug(f"Checking if user with email {command.email} already exists")
-            existing_user = await self._user_repository.find_by_email(email)
+            existing_user = self._user_repository.find_by_email(email)
             if existing_user is not None:
                 logger.warning(f"Registration failed: User with email {command.email} already exists")
                 from ...domain.errors import UserAlreadyExistsError
@@ -107,7 +107,7 @@ class RegisterUserHandler:
             
             # Step 3: Hash the password
             logger.debug("Hashing user password for secure storage")
-            hashed_password = await self._password_service.hash_password(command.password)
+            hashed_password = self._password_service.hash_password(command.password)
             password_hash = PasswordHash(hashed_password)
             
             # Step 4: Create new user domain entity
@@ -122,7 +122,7 @@ class RegisterUserHandler:
             
             # Step 5: Persist the user
             logger.debug(f"Persisting user {user.id} to repository")
-            await self._user_repository.save(user)
+            self._user_repository.save(user)
             
             # Step 6: Create user DTO for response
             logger.debug(f"Creating user DTO for successful registration of {command.email}")

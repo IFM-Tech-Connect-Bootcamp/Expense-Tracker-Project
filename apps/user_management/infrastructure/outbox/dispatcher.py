@@ -208,7 +208,7 @@ class OutboxDispatcher:
             # Mark as processed
             async with transaction.atomic():
                 event.mark_processed()
-                await event.asave()
+                event.save()
             
             logger.debug(f"Successfully processed event: {event.id}")
             return 'processed'
@@ -219,7 +219,7 @@ class OutboxDispatcher:
             # Increment attempts and record error
             async with transaction.atomic():
                 event.increment_attempts(str(e))
-                await event.asave()
+                event.save()
             
             return 'failed'
     

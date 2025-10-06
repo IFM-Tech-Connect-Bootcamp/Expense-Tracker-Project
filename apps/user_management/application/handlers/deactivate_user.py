@@ -45,7 +45,7 @@ class DeactivateUserHandler:
         """
         self._user_repository = user_repository
     
-    async def handle(self, command: DeactivateUserCommand) -> DeactivateUserResult:
+    def handle(self, command: DeactivateUserCommand) -> DeactivateUserResult:
         """Execute the user deactivation use case.
         
         Args:
@@ -66,7 +66,7 @@ class DeactivateUserHandler:
             
             # Step 2: Find user by ID
             logger.debug(f"Finding user by ID: {command.user_id}")
-            user = await self._user_repository.find_by_id(user_id)
+            user = self._user_repository.find_by_id(user_id)
             if user is None:
                 logger.warning(f"Deactivation failed: User not found: {command.user_id}")
                 from ...domain.errors import UserNotFoundError
@@ -78,7 +78,7 @@ class DeactivateUserHandler:
             
             # Step 4: Persist the updated user
             logger.debug(f"Persisting deactivated user: {command.user_id}")
-            await self._user_repository.update(user)
+            self._user_repository.update(user)
             
             # Step 5: Collect domain events for publishing
             events = user.get_domain_events()

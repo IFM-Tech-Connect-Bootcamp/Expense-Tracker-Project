@@ -20,7 +20,7 @@ from ..orm.models import OutboxEvent
 logger = logging.getLogger(__name__)
 
 
-async def write_outbox_event(
+def write_outbox_event(
     event_type: str,
     aggregate_id: Optional[UUID] = None,
     payload: Optional[Dict[str, Any]] = None,
@@ -82,12 +82,12 @@ async def write_outbox_event(
     else:
         # Save immediately within current transaction
         event = _create_event()
-        await event.asave()
+        event.save()
         logger.debug(f"Outbox event saved immediately: {event.id}")
         return event
 
 
-async def write_domain_event(
+def write_domain_event(
     domain_event: Any,
     use_transaction_commit: bool = True
 ) -> OutboxEvent:
@@ -117,7 +117,7 @@ async def write_domain_event(
             if hasattr(aggregate_id, 'value'):
                 aggregate_id = aggregate_id.value
         
-        return await write_outbox_event(
+        return write_outbox_event(
             event_type=event_type,
             aggregate_id=aggregate_id,
             payload=payload,
@@ -129,7 +129,7 @@ async def write_domain_event(
         raise ValueError(f"Failed to write domain event: {e}") from e
 
 
-async def write_multiple_events(
+def write_multiple_events(
     events: list[Any],
     use_transaction_commit: bool = True
 ) -> list[OutboxEvent]:
@@ -152,7 +152,7 @@ async def write_multiple_events(
     
     outbox_events = []
     for event in events:
-        outbox_event = await write_domain_event(
+        outbox_event = write_domain_event(
             event,
             use_transaction_commit=use_transaction_commit
         )
@@ -177,7 +177,7 @@ class OutboxEventWriter:
         """
         self._use_transaction_commit = use_transaction_commit
     
-    async def write_event(
+    def write_event(
         self,
         event_type: str,
         aggregate_id: Optional[UUID] = None,
@@ -193,14 +193,14 @@ class OutboxEventWriter:
         Returns:
             Created OutboxEvent instance.
         """
-        return await write_outbox_event(
+        return write_outbox_event(
             event_type=event_type,
             aggregate_id=aggregate_id,
             payload=payload,
             use_transaction_commit=self._use_transaction_commit
         )
     
-    async def write_domain_event(self, domain_event: Any) -> OutboxEvent:
+    def write_domain_event(self, domain_event: Any) -> OutboxEvent:
         """Write a domain event to the outbox.
         
         Args:
@@ -209,12 +209,12 @@ class OutboxEventWriter:
         Returns:
             Created OutboxEvent instance.
         """
-        return await write_domain_event(
+        return write_domain_event(
             domain_event,
             use_transaction_commit=self._use_transaction_commit
         )
     
-    async def write_events(self, events: list[Any]) -> list[OutboxEvent]:
+    def write_events(self, events: list[Any]) -> list[OutboxEvent]:
         """Write multiple events to the outbox.
         
         Args:
@@ -223,7 +223,7 @@ class OutboxEventWriter:
         Returns:
             List of created OutboxEvent instances.
         """
-        return await write_multiple_events(
+        return write_multiple_events(
             events,
             use_transaction_commit=self._use_transaction_commit
         )

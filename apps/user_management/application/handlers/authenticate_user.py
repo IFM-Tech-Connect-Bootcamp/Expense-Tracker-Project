@@ -65,7 +65,7 @@ class AuthenticateUserHandler:
         self._password_service = password_service
         self._token_provider = token_provider
     
-    async def handle(self, command: AuthenticateUserCommand) -> AuthResultDTO:
+    def handle(self, command: AuthenticateUserCommand) -> AuthResultDTO:
         """Execute the user authentication use case.
         
         Args:
@@ -84,7 +84,7 @@ class AuthenticateUserHandler:
             email = Email(command.email)
             
             # Find user by email
-            user = await self._user_repository.find_by_email(email)
+            user = self._user_repository.find_by_email(email)
             if user is None:
                 logger.warning(f"Authentication failed: User not found: {command.email}")
                 from ...domain.errors import InvalidCredentialsError
@@ -92,7 +92,7 @@ class AuthenticateUserHandler:
             
             # Verify password
             current_hash = user.password_hash.value if hasattr(user.password_hash, 'value') else user.password_hash
-            is_valid = await self._password_service.verify_password(
+            is_valid = self._password_service.verify_password(
                 command.password, 
                 current_hash
             )
@@ -109,7 +109,7 @@ class AuthenticateUserHandler:
             
             # Generate JWT token using the token provider
             logger.info(f"Generating JWT token for user: {command.email}")
-            access_token = await self._token_provider.issue_token(user.id)
+            access_token = self._token_provider.issue_token(user.id)
             
             logger.info(f"User successfully authenticated: {user.id.value}")
             

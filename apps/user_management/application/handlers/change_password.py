@@ -66,7 +66,7 @@ class ChangePasswordHandler:
         self._user_repository = user_repository
         self._password_service = password_service
     
-    async def handle(self, command: ChangePasswordCommand) -> ChangePasswordResult:
+    def handle(self, command: ChangePasswordCommand) -> ChangePasswordResult:
         """Execute the password change use case.
         
         Args:
@@ -89,7 +89,7 @@ class ChangePasswordHandler:
             
             # Step 2: Find user by ID
             logger.debug(f"Finding user by ID: {command.user_id}")
-            user = await self._user_repository.find_by_id(user_id)
+            user = self._user_repository.find_by_id(user_id)
             if user is None:
                 logger.warning(f"Password change failed: User not found: {command.user_id}")
                 from ...domain.errors import UserNotFoundError
@@ -98,7 +98,7 @@ class ChangePasswordHandler:
             # Step 3: Verify current password
             logger.debug(f"Verifying current password for user: {command.user_id}")
             current_hash = user.password_hash.value if hasattr(user.password_hash, 'value') else user.password_hash
-            is_valid = await self._password_service.verify_password(
+            is_valid = self._password_service.verify_password(
                 command.old_password,
                 current_hash
             )
@@ -119,7 +119,7 @@ class ChangePasswordHandler:
             
             # Step 5: Hash new password and update
             logger.debug(f"Hashing new password for user: {command.user_id}")
-            new_password_hash = await self._password_service.hash_password(command.new_password)
+            new_password_hash = self._password_service.hash_password(command.new_password)
             user.password_hash = PasswordHash(new_password_hash)
             
             # Step 6: Update user entity with timestamp
@@ -138,7 +138,7 @@ class ChangePasswordHandler:
             
             # Step 8: Persist the updated user
             logger.debug(f"Persisting updated user: {command.user_id}")
-            await self._user_repository.update(user)
+            self._user_repository.update(user)
             
             # Step 9: Collect domain events for publishing
             events = user.get_domain_events()

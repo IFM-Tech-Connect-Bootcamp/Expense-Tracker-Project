@@ -21,15 +21,9 @@ class UserRepository(Protocol):
     This protocol defines the contract for user data access operations.
     Implementations should handle the mapping between domain entities
     and the underlying storage mechanism.
-    
-    All methods are async to support modern async/await patterns.
     """
     
-    
-    
-    
-    
-    async def find_by_id(self, user_id: UserId) -> Optional[User]:
+    def find_by_id(self, user_id: UserId) -> Optional[User]:
         """Find a user by their unique identifier.
         
         Args:
@@ -43,11 +37,7 @@ class UserRepository(Protocol):
         """
         ...
     
-    
-    
-    
-    
-    async def find_by_email(self, email: Email) -> Optional[User]:
+    def find_by_email(self, email: Email) -> Optional[User]:
         """Find a user by their email address.
         
         Args:
@@ -61,11 +51,7 @@ class UserRepository(Protocol):
         """
         ...
     
-    
-    
-    
-    
-    async def find_active_by_email(self, email: Email) -> Optional[User]:
+    def find_active_by_email(self, email: Email) -> Optional[User]:
         """Find an active user by their email address.
         
         Args:
@@ -79,11 +65,7 @@ class UserRepository(Protocol):
         """
         ...
     
-    
-    
-    
-    
-    async def exists_by_email(self, email: Email) -> bool:
+    def exists_by_email(self, email: Email) -> bool:
         """Check if a user exists with the given email address.
         
         Args:
@@ -97,11 +79,7 @@ class UserRepository(Protocol):
         """
         ...
     
-    
-    
-    
-    
-    async def save(self, user: User) -> User:
+    def save(self, user: User) -> User:
         """Save a new user to the repository.
         
         Args:
@@ -116,11 +94,7 @@ class UserRepository(Protocol):
         """
         ...
     
-    
-    
-    
-    
-    async def update(self, user: User) -> User:
+    def update(self, user: User) -> User:
         """Update an existing user in the repository.
         
         Args:
@@ -136,11 +110,7 @@ class UserRepository(Protocol):
         """
         ...
     
-    
-    
-    
-    
-    async def delete(self, user_id: UserId) -> None:
+    def delete(self, user_id: UserId) -> None:
         """Hard delete a user from the repository.
         
         Note: This is a hard delete operation. Consider using
@@ -155,11 +125,7 @@ class UserRepository(Protocol):
         """
         ...
     
-    
-    
-    
-    
-    async def count_active_users(self) -> int:
+    def count_active_users(self) -> int:
         """Count the number of active users in the system.
         
         Returns:

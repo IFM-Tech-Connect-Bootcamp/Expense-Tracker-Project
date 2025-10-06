@@ -2,7 +2,7 @@
 
 ## Overview
 
-I have successfully implemented a complete, clean, DRY, and strictly typed domain layer for the User Management bounded context. The implementation follows Domain-Driven Design (DDD) principles and Clean Architecture patterns. Please use this as your guide to understand the domain layer. Furthermore, each file contains explicit documentation to help you understand what is going on. All the best!
+I have successfully implemented a complete, clean, DRY, and strictly typed domain layer for the User Management bounded context. The implementation follows Domain-Driven Design (DDD) principles and Clean Architecture patterns. **This implementation uses synchronous operations throughout for improved team maintainability and simplified development patterns.** Please use this as your guide to understand the domain layer. Furthermore, each file contains explicit documentation to help you understand what is going on. All the best!
 
 ## 🏗️ Architecture & Structure
 
@@ -44,17 +44,24 @@ user_management/domain/
 - Generic types where appropriate
 - Type safety at compile time
 
-### 3. **DRY (Don't Repeat Yourself)**
+### 3. **Synchronous Architecture**
+- Direct method calls without async complexity
+- Standard Python patterns for easier team adoption
+- Simplified debugging and error tracking
+- Improved maintainability for teams unfamiliar with async
+
+### 4. **DRY (Don't Repeat Yourself)**
 - Shared base classes and protocols
 - Reusable validation patterns
 - Common error handling strategies
 - Consistent naming conventions
 
-### 4. **Clean Code Practices**
+### 5. **Clean Code Practices**
 - Comprehensive docstrings
 - Single Responsibility Principle
 - Descriptive method and variable names
 - Proper exception handling
+
 
 ## 🔧 Core Components
 
@@ -128,11 +135,13 @@ user_management/domain/
 - Password hashing operations
 - Hash verification
 - Rehashing support for upgrades
+- Synchronous operations for simplified implementation
 
 #### `TokenProvider`
 - JWT token issuance
 - Token verification
 - Token refresh capabilities
+- Synchronous token operations
 
 #### `PasswordPolicy`
 - Password strength validation
@@ -145,7 +154,7 @@ user_management/domain/
 - Email-based lookups
 - Active user filtering
 - Existence checking
-- Transaction support
+- Synchronous operations for team maintainability
 
 ## 🚀 Business Logic Implementation
 
