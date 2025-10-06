@@ -1,0 +1,1 @@
+# Generated Django migration file for user management infrastructure models

@@ -1,0 +1,30 @@
+# Infrastructure dependencies for user management
+
+# Django ORM and web framework
+Django>=4.2,<5.0
+django-stubs>=4.2  # Type hints for Django
+
+# Authentication and cryptography
+passlib[bcrypt]>=1.7.4  # Password hashing with bcrypt support
+PyJWT>=2.8.0  # JWT token handling
+cryptography>=41.0.0  # Secure cryptographic primitives
+
+# Database
+psycopg2-binary>=2.9.7  # PostgreSQL adapter (production)
+# sqlite3 is included in Python standard library (development)
+
+# Async support
+asgiref>=3.7.0  # ASGI utilities for async Django
+
+# Development and testing
+pytest>=7.4.0
+pytest-django>=4.5.2
+pytest-asyncio>=0.21.0
+factory-boy>=3.3.0  # Test data factories
+freezegun>=1.2.2  # Time mocking for tests
+
+# Type checking and linting
+mypy>=1.5.0
+pylint>=2.17.0
+black>=23.0.0  # Code formatting
+isort>=5.12.0  # Import sorting
