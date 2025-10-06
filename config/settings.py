@@ -8,14 +8,10 @@ For more information on this file, see
 https://docs.djangoproject.com/en/4.2/topics/settings/
 """
 
-import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Add apps directory to Python path for modular app imports
-sys.path.insert(0, str(BASE_DIR / 'apps'))
 
 
 # Quick-start development settings - unsuitable for production
@@ -27,7 +23,7 @@ SECRET_KEY = 'django-insecure-k-%6r)3jh_ge&)^le#@mk3h5i1uj-u)7(m^rw#niz(ww*x21b^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'testserver']
 
 
 # Application definition
@@ -50,7 +46,8 @@ THIRD_PARTY_APPS = [
 
 # Local apps (bounded contexts)
 LOCAL_APPS = [
-    'user_management',
+    'apps.user_management',
+    'apps.expense_management',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -60,7 +57,8 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # This follows clean architecture principles where database concerns
 # are handled in the infrastructure layer
 MIGRATION_MODULES = {
-    'user_management': 'user_management.infrastructure.migrations',
+    'apps.user_management': 'apps.user_management.infrastructure.migrations',
+    'apps.expense_management': 'apps.expense_management.infrastructure.migrations',
 }
 
 MIDDLEWARE = [
@@ -164,8 +162,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'user_management.presentation.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  # For browsable API
+        # Temporarily using Django's built-in auth while user management is being updated
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -306,6 +305,21 @@ LOGGING = {
             'propagate': False,
         },
         'user_management.presentation': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'expense_management': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'expense_management.application': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'expense_management.infrastructure': {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
             'propagate': False,

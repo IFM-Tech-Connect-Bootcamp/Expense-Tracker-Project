@@ -33,6 +33,21 @@ class AmountTZS:
         object.__setattr__(self, 'value', quantized)
     
     @classmethod
+    def from_decimal(cls, amount: Decimal) -> Self:
+        """Create AmountTZS from Decimal value.
+        
+        Args:
+            amount: Decimal amount to convert.
+            
+        Returns:
+            AmountTZS instance.
+            
+        Raises:
+            ValueError: If amount is negative.
+        """
+        return cls(value=amount)
+    
+    @classmethod
     def from_float(cls, amount: float) -> Self:
         """Create AmountTZS from float value.
         
@@ -151,6 +166,14 @@ class AmountTZS:
         """
         return self.value == Decimal('0.00')
     
+    def to_decimal(self) -> Decimal:
+        """Convert to Decimal for database storage.
+        
+        Returns:
+            Decimal representation of the amount.
+        """
+        return self.value
+    
     def to_float(self) -> float:
         """Convert to float for serialization.
         
@@ -158,6 +181,14 @@ class AmountTZS:
             Float representation of the amount.
         """
         return float(self.value)
+    
+    def to_formatted_string(self) -> str:
+        """Return formatted string with currency symbol and thousands separators.
+        
+        Returns:
+            Formatted string representation (e.g., "TZS 1,234.56").
+        """
+        return f"TZS {self.value:,.2f}"
     
     def __str__(self) -> str:
         """Return formatted string representation."""

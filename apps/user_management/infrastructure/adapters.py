@@ -66,22 +66,15 @@ class InfrastructurePasswordService:
         # Validate password against policy first
         await self._policy.validate_password_strength(password)
         
-        # Hash the password (domain services are async)
-        password_hash = await self._hasher.hash(password)
+        # Hash the password (hasher is sync, only policy is async)
+        password_hash = self._hasher.hash(password)
         return password_hash.value
     
-    async def verify_password(self, password: str, hashed: str) -> bool:
-        """Verify a password against its hash asynchronously.
-        
-        Args:
-            password: Plain text password to verify.
-            hashed: Hashed password to verify against.
-            
-        Returns:
-            True if password matches hash, False otherwise.
-        """
-        password_hash = PasswordHash(hashed)
-        return await self._hasher.verify(password_hash, password)
+    async def verify_password(self, password: str, hashed_password: str) -> bool:
+        """Verify if a password matches the stored hash."""
+        password_hash = PasswordHash(hashed_password)
+        # Verify is sync, only password strength validation is async
+        return self._hasher.verify(password_hash, password)
 
 
 class InfrastructureTokenService:
@@ -109,7 +102,7 @@ class InfrastructureTokenService:
             JWT token string.
         """
         domain_user_id = UserId.from_string(user_id)
-        return await self._provider.issue_token(domain_user_id, claims)
+        return self._provider.issue_token(domain_user_id, claims)
     
     async def verify_token(self, token: str) -> str:
         """Verify a JWT token and extract user ID asynchronously.
@@ -123,7 +116,7 @@ class InfrastructureTokenService:
         Raises:
             ValueError: If token is invalid.
         """
-        user_id = await self._provider.verify_token(token)
+        user_id = self._provider.verify_token(token)
         return str(user_id)
     
     async def refresh_token(self, token: str) -> str:
@@ -138,7 +131,7 @@ class InfrastructureTokenService:
         Raises:
             ValueError: If token cannot be refreshed.
         """
-        return await self._provider.refresh_token(token)
+        return self._provider.refresh_token(token)
 
 
 def create_password_service(

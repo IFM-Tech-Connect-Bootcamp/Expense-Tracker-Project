@@ -6,11 +6,19 @@ correctly and can connect to external dependencies.
 
 import asyncio
 import logging
+import warnings
 from typing import Any
 
 from django.core.management.base import BaseCommand, CommandParser
 
-from ...adapters import create_password_service, create_token_service
+# Suppress bcrypt version compatibility warnings from passlib
+warnings.filterwarnings('ignore', message='.*bcrypt version.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*error reading bcrypt version.*')
+
+# Also suppress at logging level for passlib
+logging.getLogger('passlib.handlers.bcrypt').setLevel(logging.ERROR)
+
+from ...adapters import create_password_service, create_token_service, InfrastructureTokenService
 from ...config import get_config
 from ...container import get_container
 from ...orm.models import OutboxEvent, UserModel
@@ -125,7 +133,7 @@ class Command(BaseCommand):
         
         # Test password service
         password_service = create_password_service()
-        test_password = "TestPassword123!"
+        test_password = "Zx9&Mq7!Kp2$Vn4%"  # Complex password avoiding common patterns
         
         try:
             hashed = await password_service.hash_password(test_password)
@@ -139,8 +147,10 @@ class Command(BaseCommand):
         except Exception as e:
             raise Exception(f"Password service check failed: {e}")
         
-        # Test token service
-        token_service = create_token_service()
+        # Test token service using container
+        from ...container import get_container
+        container = get_container()
+        token_service = container.get(InfrastructureTokenService)
         test_user_id = "550e8400-e29b-41d4-a716-446655440000"
         
         try:
@@ -161,10 +171,10 @@ class Command(BaseCommand):
         
         # Check if outbox table exists and is accessible
         try:
-            pending_count = OutboxEvent.objects.filter(status='pending').count()
-            failed_count = OutboxEvent.objects.filter(status='failed').count()
+            pending_count = OutboxEvent.objects.filter(processed_at__isnull=True).count()
+            processed_count = OutboxEvent.objects.filter(processed_at__isnull=False).count()
             
-            self.stdout.write(f"  ✓ Outbox accessible ({pending_count} pending, {failed_count} failed)")
+            self.stdout.write(f"  ✓ Outbox accessible ({pending_count} pending, {processed_count} processed)")
             
         except Exception as e:
             raise Exception(f"Outbox check failed: {e}")

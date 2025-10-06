@@ -46,6 +46,12 @@ def api_root(request):
             'swagger': '/api/docs/',
             'redoc': '/api/redoc/',
             'openapi_schema': '/api/schema/',
+        },
+        'infrastructure': {
+            'expense_management_commands': [
+                'python manage.py flush_expense_outbox --dry-run',
+                'python manage.py flush_expense_outbox --older-than-hours 48'
+            ]
         }
     })
 
@@ -66,7 +72,7 @@ urlpatterns = [
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     
     # API v1 - Bounded context URLs
-    path('api/v1/users/', include('user_management.presentation.urls')),
+    path('api/v1/users/', include('apps.user_management.presentation.urls')),
 ]
 
 # Add sidecar static files serving for Swagger UI assets in development

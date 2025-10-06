@@ -12,7 +12,7 @@ class UserManagementConfig(AppConfig):
     """Configuration for User Management Django app."""
     
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'user_management'
+    name = 'apps.user_management'
     verbose_name = 'User Management'
     
     def ready(self) -> None:

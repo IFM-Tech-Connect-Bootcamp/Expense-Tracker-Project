@@ -35,8 +35,14 @@ user_management/infrastructure/
 │   └── dispatcher.py             # Event processing
 ├── repositories/                  # Repository implementations
 │   └── user_repository_django.py # Django ORM user repository
-└── subscribers/                   # Event handling
-    └── notification_handlers.py  # Domain event subscribers
+├── subscribers/                   # Event handling
+│   └── notification_handlers.py  # Domain event subscribers
+└── management/                    # Django management commands
+    ├── __init__.py               # Management package
+    └── commands/
+        ├── __init__.py           # Commands package
+        ├── check_infrastructure.py  # Infrastructure health checks
+        └── flush_user_outbox.py  # Comprehensive outbox management
 ```
 
 ## 🎯 Key Features & Principles
@@ -64,6 +70,8 @@ user_management/infrastructure/
 - Security best practices (bcrypt, JWT)
 - Database transaction management
 - Synchronous event processing with outbox pattern
+- Infrastructure health checks and operational commands
+- Advanced outbox management with retry logic and cleanup
 
 ## 🔧 Core Components
 
@@ -290,6 +298,80 @@ def verify_password(self, password: str, hashed: str) -> bool
 - User ID extraction
 - Token refresh handling
 - Error translation
+- Proper async/sync interface handling
+
+### Management Commands
+
+#### Infrastructure Health Checks
+**Purpose**: Comprehensive infrastructure validation and monitoring
+
+**Features**:
+- Configuration loading validation
+- Database connectivity and constraint testing
+- Authentication services validation (password and token services)
+- Outbox system integrity checks
+- Dependency injection container validation
+- Component-specific health monitoring
+- Bcrypt compatibility warning suppression
+
+**Command Usage**:
+```bash
+# Complete infrastructure validation
+python manage.py check_user_infrastructure
+
+# Verbose output for debugging
+python manage.py check_user_infrastructure --verbose
+```
+
+**Health Check Components**:
+- **Configuration**: JWT secret keys, password policies, token expiration settings
+- **Database**: Connectivity, user model constraints, outbox event integrity
+- **Authentication Services**: Password hashing/verification, JWT token generation/verification
+- **Outbox System**: Event writing capabilities, processing status tracking
+- **Dependency Injection**: Service creation, singleton behavior, protocol compliance
+
+#### Outbox Event Management
+**Purpose**: Advanced outbox event processing and maintenance
+
+**Features**:
+- Single and continuous processing modes
+- Failed event retry mechanisms with exponential backoff
+- Advanced cleanup with configurable retention periods
+- Comprehensive statistics and monitoring
+- Dry-run capabilities for safe operations
+- Legacy compatibility for existing workflows
+
+**Command Usage**:
+```bash
+# Single processing run
+python manage.py flush_user_outbox
+
+# Continuous background processing
+python manage.py flush_user_outbox --continuous --interval 30
+
+# Process with custom batch size
+python manage.py flush_user_outbox --batch-size 50
+
+# Retry failed events
+python manage.py flush_user_outbox --retry-failed
+
+# Advanced cleanup (recommended)
+python manage.py flush_user_outbox --cleanup --cleanup-days 30
+
+# Show comprehensive statistics
+python manage.py flush_user_outbox --stats
+
+# Verbose logging for debugging
+python manage.py flush_user_outbox --verbose
+```
+
+**Outbox Management Features**:
+- **Single Processing**: One-time event processing with comprehensive reporting
+- **Continuous Processing**: Background service mode with configurable intervals
+- **Failed Event Retry**: Automatic retry mechanisms with exponential backoff
+- **Advanced Cleanup**: Date-based cleanup with configurable retention periods
+- **Statistics & Monitoring**: Detailed metrics on event processing performance
+- **Command Discovery**: Proper Django command registration through wrapper pattern
 
 ### Dependency Injection
 
@@ -341,6 +423,24 @@ MIGRATION_MODULES = {
 - Custom admin interfaces for outbox monitoring
 - Proper field display and filtering
 - Security-conscious admin access
+
+#### Management Command Integration
+**Command Discovery Pattern**:
+- App-level wrapper commands for Django discovery
+- Infrastructure layer command implementations
+- Clean architecture preservation during command execution
+- Proper error handling and logging integration
+
+**Command Registration**:
+```python
+# App-level wrapper (apps/user_management/management/commands/)
+from ...infrastructure.management.commands.check_infrastructure import Command as InfraCommand
+
+class Command(BaseCommand):
+    def handle(self, *args, **options):
+        infra_command = InfraCommand()
+        infra_command.handle(*args, **options)
+```
 
 #### Async Django Support
 
@@ -487,16 +587,19 @@ except IntegrityError as e:
 - **Simplicity**: Synchronous patterns for improved team productivity
 
 ### For Operations Team
-- **Monitoring**: Comprehensive logging and metrics
-- **Reliability**: Transactional outbox ensures event delivery
-- **Security**: Industry-standard authentication practices
-- **Maintainability**: Simplified synchronous architecture
+- **Monitoring**: Comprehensive logging and metrics through health checks
+- **Reliability**: Transactional outbox ensures event delivery with advanced retry logic
+- **Security**: Industry-standard authentication practices with proper validation
+- **Maintainability**: Simplified synchronous architecture with operational commands
+- **Troubleshooting**: Comprehensive health checks and diagnostic capabilities
+- **Event Processing**: Advanced outbox management with statistics and cleanup tools
 
 ### For Business
-- **Data Integrity**: Transaction support with simplified patterns
-- **Audit Trail**: Complete event history
-- **Security Compliance**: Strong authentication and authorization
-- **Maintainability**: Reliable synchronous processing patterns
+- **Data Integrity**: Transaction support with simplified patterns and validation
+- **Audit Trail**: Complete event history with processing metrics
+- **Security Compliance**: Strong authentication and authorization with health monitoring
+- **Maintainability**: Reliable synchronous processing patterns with operational tools
+- **Operational Excellence**: Comprehensive infrastructure monitoring and management capabilities
 
 ## 🔄 Event Processing Flow
 
@@ -504,7 +607,40 @@ except IntegrityError as e:
 1. **Event Generation**: Domain entities publish events
 2. **Synchronous Writing**: Events written to outbox within transaction
 3. **Background Processing**: Dispatcher processes events (can be async separately)
-4. **Delivery Guarantee**: Events retried until successful delivery
-5. **Audit Trail**: Complete event processing history maintained
+4. **Delivery Guarantee**: Events retried until successful delivery with advanced retry logic
+5. **Audit Trail**: Complete event processing history maintained with comprehensive statistics
 
-This infrastructure layer provides a robust, secure, and maintainable foundation for the user management domain while maintaining clean architecture principles and supporting simplified synchronous development patterns that improve team productivity and code maintainability.
+### Management Command Lifecycle
+1. **Command Discovery**: Django discovers app-level wrapper commands
+2. **Infrastructure Delegation**: Wrappers delegate to infrastructure layer implementations
+3. **Health Validation**: Comprehensive component validation with detailed reporting
+4. **Operational Management**: Advanced outbox processing with retry and cleanup capabilities
+5. **Monitoring Integration**: Statistics collection and performance metrics for operational teams
+
+## 🛠️ Operational Excellence
+
+### Infrastructure Validation
+**Automated Health Checks**:
+- Real-time infrastructure component validation
+- Database connectivity and constraint verification
+- Authentication service functionality testing
+- Outbox system integrity monitoring
+- Container dependency resolution validation
+
+### Event Processing Management
+**Advanced Outbox Operations**:
+- Configurable batch processing for optimal performance
+- Intelligent retry mechanisms with exponential backoff
+- Comprehensive cleanup with date-based retention policies
+- Detailed statistics and performance monitoring
+- Operational safety through dry-run capabilities
+
+### Production Monitoring
+**Operational Observability**:
+- Component-specific health status reporting
+- Event processing performance metrics
+- Failed event tracking and retry statistics
+- Infrastructure dependency validation
+- Bcrypt compatibility issue resolution
+
+This infrastructure layer provides a robust, secure, and maintainable foundation for the user management domain while maintaining clean architecture principles and supporting simplified synchronous development patterns that improve team productivity and code maintainability. The comprehensive management commands ensure operational excellence and provide the tools necessary for effective infrastructure monitoring and maintenance.

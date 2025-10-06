@@ -38,6 +38,15 @@ class ExpenseDTO:
     created_at: datetime
     updated_at: datetime
     
+    @property
+    def amount_formatted(self) -> str:
+        """Get formatted amount string with currency.
+        
+        Returns:
+            Formatted amount string (e.g., "TZS 150.75").
+        """
+        return f"TZS {self.amount_tzs:,.2f}"
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert DTO to dictionary representation.
         

@@ -41,6 +41,15 @@ class ExpenseNotFoundError(ExpenseError):
         self.expense_id = expense_id
 
 
+class ExpenseAlreadyExistsError(ExpenseError):
+    """Raised when trying to create an expense that already exists."""
+    
+    def __init__(self, expense_id: str, details: Optional[dict[str, Any]] = None) -> None:
+        message = f"Expense with ID {expense_id} already exists"
+        super().__init__(message, details)
+        self.expense_id = expense_id
+
+
 class ExpenseAccessDeniedError(ExpenseError):
     """Raised when a user tries to access an expense they don't own."""
     
@@ -68,6 +77,15 @@ class CategoryNotFoundError(CategoryError):
     
     def __init__(self, category_id: str, details: Optional[dict[str, Any]] = None) -> None:
         message = f"Category with ID {category_id} not found"
+        super().__init__(message, details)
+        self.category_id = category_id
+
+
+class CategoryAlreadyExistsError(CategoryError):
+    """Raised when trying to create a category that already exists."""
+    
+    def __init__(self, category_id: str, details: Optional[dict[str, Any]] = None) -> None:
+        message = f"Category with ID {category_id} already exists"
         super().__init__(message, details)
         self.category_id = category_id
 

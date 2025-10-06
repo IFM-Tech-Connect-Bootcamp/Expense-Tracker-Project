@@ -8,6 +8,7 @@ from typing import Optional, Protocol, TypeVar
 
 from ..domain.repositories.user_repository import UserRepository
 from ..domain.services.password_policy import PasswordHasher, PasswordPolicy, TokenProvider
+from .adapters import InfrastructureTokenService
 from .auth.bcrypt_hasher import BcryptPasswordHasher
 from .auth.jwt_provider import JWTTokenProvider
 from .auth.password_policy import DefaultPasswordPolicy, LenientPasswordPolicy, StrictPasswordPolicy
@@ -108,6 +109,14 @@ class InfrastructureContainer:
         elif service_type == DjangoUserRepository:
             return DjangoUserRepository()
         
+        elif service_type == InfrastructureTokenService:
+            provider = JWTTokenProvider(
+                secret_key=self._config.auth.jwt_secret_key,
+                algorithm=self._config.auth.jwt_algorithm,
+                expiry_minutes=self._config.auth.jwt_access_token_expire_minutes,
+            )
+            return InfrastructureTokenService(provider)
+        
         elif service_type == BcryptPasswordHasher:
             return BcryptPasswordHasher(
                 rounds=self._config.auth.bcrypt_rounds
@@ -117,8 +126,7 @@ class InfrastructureContainer:
             return JWTTokenProvider(
                 secret_key=self._config.auth.jwt_secret_key,
                 algorithm=self._config.auth.jwt_algorithm,
-                access_token_expire_minutes=self._config.auth.jwt_access_token_expire_minutes,
-                refresh_token_expire_days=self._config.auth.jwt_refresh_token_expire_days,
+                expiry_minutes=self._config.auth.jwt_access_token_expire_minutes,
             )
         
         elif service_type == DefaultPasswordPolicy:
