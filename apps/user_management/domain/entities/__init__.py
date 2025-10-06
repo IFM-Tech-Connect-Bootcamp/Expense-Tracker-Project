@@ -1,8 +1,5 @@
 """Entities for the User Management domain."""
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
+from .user import User
 
 __all__ = ["User"]

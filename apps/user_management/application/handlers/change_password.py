@@ -138,7 +138,7 @@ class ChangePasswordHandler:
             
             # Step 8: Persist the updated user
             logger.debug(f"Persisting updated user: {command.user_id}")
-            await self._user_repository.save(user)
+            await self._user_repository.update(user)
             
             # Step 9: Collect domain events for publishing
             events = user.get_domain_events()

@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
+from django.utils import timezone
 
 from ..value_objects.user_id import UserId
 from ..value_objects.email import Email
@@ -49,8 +50,8 @@ class User:
     password_hash: PasswordHash
     first_name: FirstName
     last_name: LastName
-    created_at: datetime = field(default_factory=lambda: datetime.utcnow())
-    updated_at: datetime = field(default_factory=lambda: datetime.utcnow())
+    created_at: datetime = field(default_factory=timezone.now)
+    updated_at: datetime = field(default_factory=lambda: timezone.now())
     status: UserStatus = UserStatus.ACTIVE
     
     # Domain events that occurred during this session
@@ -69,7 +70,7 @@ class User:
         # Names are now required and validated by their value objects
         # No additional validation needed here for names
         
-        if self.created_at > datetime.utcnow():
+        if self.created_at > timezone.now():
             raise DomainValidationError("User", "Created date cannot be in the future")
         
         if self.updated_at < self.created_at:
@@ -108,7 +109,7 @@ class User:
             DomainValidationError: If the user data is invalid.
         """
         user_id = user_id or UserId.new()
-        now = datetime.utcnow()
+        now = timezone.now()
         
         user = cls(
             id=user_id,
@@ -176,7 +177,7 @@ class User:
             self.last_name = new_last_name
         
         # Update timestamp
-        self.updated_at = datetime.utcnow()
+        self.updated_at = timezone.now()
         
         # Validate after updates
         self._validate_invariants()
@@ -261,7 +262,7 @@ class User:
         
         # Hash the new password (this will validate policy via the hasher)
         self.password_hash = await password_hasher.hash(new_password)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = timezone.now()
         
         # Publish event
         from ..events.user_events import UserPasswordChanged
@@ -292,7 +293,7 @@ class User:
             )
         
         self.status = UserStatus.DEACTIVATED
-        self.updated_at = datetime.utcnow()
+        self.updated_at = timezone.now()
         
         # Publish event
         from ..events.user_events import UserDeactivated
@@ -321,7 +322,7 @@ class User:
             )
         
         self.status = UserStatus.ACTIVE
-        self.updated_at = datetime.utcnow()
+        self.updated_at = timezone.now()
     
     
     

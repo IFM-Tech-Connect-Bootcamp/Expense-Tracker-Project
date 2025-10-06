@@ -583,7 +583,9 @@ expense_tracker/server_app/user_management/infrastructure/*/__pycache__/*
 .env
 .vscode/
 config/__pycache__/*
+apps/__pycache__/*
 apps/user_management/__pycache__/*
 apps/user_management/*/__pycache__/*
 apps/user_management/*/*/__pycache__/*
 apps/user_management/*/*/*/__pycache__/*
+logs/django.log

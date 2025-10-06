@@ -35,11 +35,9 @@ class DjangoTransactionManager(TransactionManager):
         """
         if self._transaction_depth == 0:
             transaction.set_autocommit(False)
-            logger.debug("Started new database transaction")
         else:
             # Create savepoint for nested transaction
             savepoint_id = transaction.savepoint()
-            logger.debug(f"Created savepoint: {savepoint_id}")
         
         self._transaction_depth += 1
 
@@ -59,10 +57,9 @@ class DjangoTransactionManager(TransactionManager):
         if self._transaction_depth == 0:
             transaction.commit()
             transaction.set_autocommit(True)
-            logger.debug("Committed database transaction")
         else:
             # Release savepoint for nested transaction
-            logger.debug("Released savepoint for nested transaction")
+            pass
 
     def rollback_transaction(self) -> None:
         """Rollback the current transaction.
@@ -80,10 +77,9 @@ class DjangoTransactionManager(TransactionManager):
         if self._transaction_depth == 0:
             transaction.rollback()
             transaction.set_autocommit(True)
-            logger.debug("Rolled back database transaction")
         else:
             # Rollback to savepoint for nested transaction
-            logger.debug("Rolled back to savepoint for nested transaction")
+            pass
 
     def is_in_transaction(self) -> bool:
         """Check if currently in a transaction.

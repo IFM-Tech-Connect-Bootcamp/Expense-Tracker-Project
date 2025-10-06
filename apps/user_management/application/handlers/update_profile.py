@@ -78,8 +78,15 @@ class UpdateProfileHandler:
             
             # Step 3: Prepare profile update values
             logger.debug(f"Preparing profile update values for user: {command.user_id}")
+            logger.debug(f"Command new_email: {command.new_email}")
+            logger.debug(f"Command new_first_name: {command.new_first_name}")
+            logger.debug(f"Command new_last_name: {command.new_last_name}")
+            
             new_first_name = FirstName(command.new_first_name) if command.new_first_name else None
             new_last_name = LastName(command.new_last_name) if command.new_last_name else None
+            
+            logger.debug(f"Prepared new_first_name: {new_first_name}")
+            logger.debug(f"Prepared new_last_name: {new_last_name}")
             
             # Step 4: Update user profile (domain method handles validation)
             logger.debug(f"Updating user profile for user: {command.user_id}")
@@ -90,7 +97,7 @@ class UpdateProfileHandler:
             
             # Step 5: Persist the updated user
             logger.debug(f"Persisting updated user: {command.user_id}")
-            await self._user_repository.save(user)
+            await self._user_repository.update(user)
             
             # Step 6: Create user DTO for response
             logger.debug(f"Creating user DTO for successful profile update of user: {command.user_id}")

@@ -85,16 +85,14 @@ class InfrastructureContainer:
         # Auth services
         elif service_type == PasswordHasher:
             return BcryptPasswordHasher(
-                rounds=self._config.auth.bcrypt_rounds,
-                check_needs_rehash=self._config.auth.password_rehash_check,
+                rounds=self._config.auth.bcrypt_rounds
             )
         
         elif service_type == TokenProvider:
             return JWTTokenProvider(
                 secret_key=self._config.auth.jwt_secret_key,
                 algorithm=self._config.auth.jwt_algorithm,
-                access_token_expire_minutes=self._config.auth.jwt_access_token_expire_minutes,
-                refresh_token_expire_days=self._config.auth.jwt_refresh_token_expire_days,
+                expiry_minutes=self._config.auth.jwt_access_token_expire_minutes,
             )
         
         elif service_type == PasswordPolicy:
@@ -112,8 +110,7 @@ class InfrastructureContainer:
         
         elif service_type == BcryptPasswordHasher:
             return BcryptPasswordHasher(
-                rounds=self._config.auth.bcrypt_rounds,
-                check_needs_rehash=self._config.auth.password_rehash_check,
+                rounds=self._config.auth.bcrypt_rounds
             )
         
         elif service_type == JWTTokenProvider:

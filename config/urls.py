@@ -2,7 +2,7 @@
 URL configuration for Expense Tracker project.
 
 This is the main URL configuration that routes requests to appropriate
-bounded context applications.
+bounded context applications and provides API documentation.
 
 For more information on this file, see
 https://docs.djangoproject.com/en/4.2/topics/http/urls/
@@ -11,6 +11,11 @@ https://docs.djangoproject.com/en/4.2/topics/http/urls/
 from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularSwaggerView,
+    SpectacularRedocView,
+)
 
 
 def health_check(request):
@@ -31,8 +36,16 @@ def api_root(request):
             'health': '/health/',
             'admin': '/admin/',
             'api': {
-                'user_management': '/api/users/',
+                'user_management': '/api/v1/users/',
+                'schema': '/api/schema/',
+                'docs': '/api/docs/',
+                'redoc': '/api/redoc/',
             }
+        },
+        'documentation': {
+            'swagger': '/api/docs/',
+            'redoc': '/api/redoc/',
+            'openapi_schema': '/api/schema/',
         }
     })
 
@@ -47,6 +60,11 @@ urlpatterns = [
     # API root
     path('', api_root, name='api_root'),
     
-    # Bounded context URLs
-    path('api/users/', include('user_management.urls')),
+    # API Documentation
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    
+    # API v1 - Bounded context URLs
+    path('api/v1/users/', include('user_management.presentation.urls')),
 ]

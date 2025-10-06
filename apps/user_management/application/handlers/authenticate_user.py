@@ -6,11 +6,13 @@ This module contains the handler for user authentication use cases.
 from __future__ import annotations
 
 import logging
-import secrets
 from typing import TYPE_CHECKING, Protocol
+
+from django.conf import settings
 
 from ...domain.errors import UserManagementDomainError
 from ...domain.repositories.user_repository import UserRepository
+from ...domain.services.password_policy import TokenProvider
 from ...domain.value_objects.email import Email
 from ..commands.authenticate_user import AuthenticateUserCommand
 from ..dto import AuthResultDTO, UserDTO
@@ -50,15 +52,18 @@ class AuthenticateUserHandler:
         self,
         user_repository: UserRepository,
         password_service: PasswordService,
+        token_provider: TokenProvider,
     ) -> None:
         """Initialize the authenticate user handler.
         
         Args:
             user_repository: Repository for user persistence operations.
             password_service: Service for password verification operations.
+            token_provider: Service for JWT token generation.
         """
         self._user_repository = user_repository
         self._password_service = password_service
+        self._token_provider = token_provider
     
     async def handle(self, command: AuthenticateUserCommand) -> AuthResultDTO:
         """Execute the user authentication use case.
@@ -102,29 +107,39 @@ class AuthenticateUserHandler:
                 from ...domain.errors import UserDeactivatedError
                 raise UserDeactivatedError(user.id.value)
             
-            # Generate authentication token
-            access_token = secrets.token_urlsafe(32)
+            # Generate JWT token using the token provider
+            logger.info(f"Generating JWT token for user: {command.email}")
+            access_token = await self._token_provider.issue_token(user.id)
             
             logger.info(f"User successfully authenticated: {user.id.value}")
             
             # Create user DTO
-            user_dto = UserDTO(
-                id=str(user.id.value),
-                email=user.email.value,
-                first_name=user.first_name.value,
-                last_name=user.last_name.value,
-                full_name=f"{user.first_name.value} {user.last_name.value}",
-                status=user.status.value,
-                created_at=user.created_at,
-                updated_at=user.updated_at
-            )
+            try:
+                user_dto = UserDTO(
+                    id=str(user.id.value),
+                    email=user.email.value,
+                    first_name=user.first_name.value,
+                    last_name=user.last_name.value,
+                    full_name=f"{user.first_name.value} {user.last_name.value}",
+                    status=user.status.value,
+                    created_at=user.created_at,
+                    updated_at=user.updated_at
+                )
+            except Exception as e:
+                logger.error(f"Failed to create UserDTO: {e}")
+                raise ValueError(f"Failed to create user DTO: {e}") from e
             
             # Return authentication result
-            return AuthResultDTO(
-                user=user_dto,
-                access_token=access_token,
-                expires_in=3600  # 1 hour
-            )
+            try:
+                auth_result = AuthResultDTO(
+                    user=user_dto,
+                    access_token=access_token,
+                    expires_in=settings.JWT_SETTINGS['ACCESS_TOKEN_LIFETIME']
+                )
+                return auth_result
+            except Exception as e:
+                logger.error(f"Failed to create AuthResultDTO: {e}")
+                raise ValueError(f"Failed to create auth result: {e}") from e
             
         except UserManagementDomainError as e:
             logger.error(f"Domain error during authentication: {e}")

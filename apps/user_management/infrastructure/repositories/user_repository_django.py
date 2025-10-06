@@ -81,7 +81,7 @@ class DjangoUserRepository(UserRepository):
         try:
             model = await UserModel.objects.filter(email=email.value).afirst()
             if model:
-                user = await model_to_entity(model)
+                user = model_to_entity(model)
                 logger.debug(f"Found user: {user.id.value}")
                 return user
             
@@ -112,7 +112,7 @@ class DjangoUserRepository(UserRepository):
                 is_active=True
             ).afirst()
             if model:
-                user = await model_to_entity(model)
+                user = model_to_entity(model)
                 logger.debug(f"Found active user: {user.id.value}")
                 return user
             
@@ -162,17 +162,15 @@ class DjangoUserRepository(UserRepository):
             if await self.exists_by_email(user.email):
                 raise UserAlreadyExistsError(f"User with email {user.email.value} already exists")
             
-            # Create new model within transaction
-            async with transaction.atomic():
-                model_data = entity_to_model_data(user)
-                validate_model_data(model_data)
-                
-                model = await UserModel.objects.acreate(**model_data)
-                logger.info(f"User saved with ID: {model.id}")
-                
-                # Convert back to entity and return
-                saved_user = await model_to_entity(model)
-                return saved_user
+            # Create new model
+            model_data = entity_to_model_data(user)
+            
+            model = await UserModel.objects.acreate(**model_data)
+            logger.info(f"User saved with ID: {model.id}")
+            
+            # Convert back to entity and return
+            saved_user = model_to_entity(model)
+            return saved_user
                 
         except IntegrityError as e:
             logger.error(f"Database integrity error saving user: {e}")
@@ -200,27 +198,26 @@ class DjangoUserRepository(UserRepository):
         logger.debug(f"Updating user: {user.id.value}")
         
         try:
-            async with transaction.atomic():
-                # Get existing model
-                try:
-                    existing_model = await UserModel.objects.aget(id=user.id.value)
-                except ObjectDoesNotExist:
-                    logger.warning(f"User not found for update: {user.id.value}")
-                    raise UserNotFoundError(str(user.id.value))
-                
-                # Update model with new data
-                try:
-                    updated_model = update_model_from_entity(existing_model, user)
-                    await updated_model.asave()
-                except IntegrityError as e:
-                    if 'email' in str(e).lower():
-                        logger.warning(f"Email already exists during update: {user.email.value}")
-                        raise UserAlreadyExistsError(user.email.value) from e
-                    raise ValueError(f"Database integrity error: {e}") from e
-                
-                # Return updated entity
-                validate_model_data(updated_model)
-                updated_user = model_to_entity(updated_model)
+            # Get existing model
+            try:
+                existing_model = await UserModel.objects.aget(id=user.id.value)
+            except ObjectDoesNotExist:
+                logger.warning(f"User not found for update: {user.id.value}")
+                raise UserNotFoundError(str(user.id.value))
+            
+            # Update model with new data
+            try:
+                updated_model = update_model_from_entity(existing_model, user)
+                await updated_model.asave()
+            except IntegrityError as e:
+                if 'email' in str(e).lower():
+                    logger.warning(f"Email already exists during update: {user.email.value}")
+                    raise UserAlreadyExistsError(user.email.value) from e
+                raise ValueError(f"Database integrity error: {e}") from e
+            
+            # Return updated entity
+            validate_model_data(updated_model)
+            updated_user = model_to_entity(updated_model)
                 
             logger.info(f"Successfully updated user: {user.id.value}")
             return updated_user
@@ -244,14 +241,13 @@ class DjangoUserRepository(UserRepository):
         logger.debug(f"Deleting user: {user_id.value}")
         
         try:
-            async with transaction.atomic():
-                try:
-                    model = await UserModel.objects.aget(id=user_id.value)
-                    await model.adelete()
-                except ObjectDoesNotExist:
-                    logger.warning(f"User not found for deletion: {user_id.value}")
-                    raise UserNotFoundError(str(user_id.value))
-                
+            try:
+                model = await UserModel.objects.aget(id=user_id.value)
+                await model.adelete()
+            except ObjectDoesNotExist:
+                logger.warning(f"User not found for deletion: {user_id.value}")
+                raise UserNotFoundError(str(user_id.value))
+            
             logger.info(f"Successfully deleted user: {user_id.value}")
             
         except UserNotFoundError:
