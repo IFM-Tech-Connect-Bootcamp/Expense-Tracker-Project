@@ -88,17 +88,16 @@ class DeleteExpenseHandler:
                 from ...domain.errors import ExpenseAccessDeniedError
                 raise ExpenseAccessDeniedError(f"User {command.user_id} does not own expense {command.expense_id}")
             
-            # Step 3: Mark expense for deletion (generates domain event)
-            logger.debug(f"Marking expense {command.expense_id} for deletion")
-            expense.delete()
+            # Step 3: Generate expense deletion domain event
+            logger.debug(f"Generating deletion event for expense {command.expense_id}")
+            deletion_event = self._create_expense_deleted_event(expense)
             
             # Step 4: Delete the expense from repository
-            logger.debug(f"Deleting expense {expense.id} from repository")
+            logger.debug(f"Deleting expense {expense.expense_id} from repository")
             self._expense_repository.delete(expense_id)
             
             # Step 5: Collect domain events for publishing
-            events = expense.get_domain_events()
-            expense.clear_domain_events()
+            events = [deletion_event]
             logger.info(f"Expense deletion completed successfully for expense {command.expense_id}, collected {len(events)} domain events")
             
             return DeleteExpenseResult(
@@ -112,3 +111,26 @@ class DeleteExpenseHandler:
         except Exception as e:
             logger.error(f"Unexpected error during expense deletion for expense {command.expense_id}: {str(e)}")
             raise ExpenseDeleteFailedError(f"Failed to delete expense: {str(e)}") from e
+    
+    def _create_expense_deleted_event(self, expense: Expense) -> DomainEvent:
+        """Create expense deleted domain event.
+        
+        Args:
+            expense: The expense being deleted.
+            
+        Returns:
+            ExpenseDeleted domain event.
+        """
+        from ...domain.events.expense_events import ExpenseDeleted
+        from datetime import datetime
+        import uuid
+        
+        return ExpenseDeleted(
+            event_id=str(uuid.uuid4()),
+            occurred_at=datetime.now(),
+            aggregate_id=str(expense.expense_id),
+            event_type="ExpenseDeleted",
+            user_id=expense.user_id,
+            category_id=expense.category_id,
+            amount_tzs=expense.amount_tzs
+        )

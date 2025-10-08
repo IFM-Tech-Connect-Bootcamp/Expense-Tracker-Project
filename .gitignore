@@ -593,3 +593,4 @@ apps/expense_management/*/__pycache__/*
 apps/expense_management/*/*/__pycache__/*
 apps/expense_management/*/*/*/__pycache__/*
 logs/django.log
+shared/__pycache__/*

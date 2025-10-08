@@ -162,7 +162,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # Temporarily using Django's built-in auth while user management is being updated
+        # JWT authentication from User Management context
+        'apps.user_management.presentation.authentication.JWTAuthentication',
+        # Fallback to session authentication for admin/browsable API
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
@@ -204,6 +206,12 @@ JWT_SETTINGS = {
     'ISSUER': 'expense-tracker',
     'AUDIENCE': 'expense-tracker-users',
 }
+
+# Individual JWT settings for infrastructure layer compatibility
+JWT_SECRET_KEY = SECRET_KEY
+JWT_ALGORITHM = 'HS256'
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 1 hour in minutes
+JWT_REFRESH_TOKEN_EXPIRE_DAYS = 1  # 1 day
 
 
 # API Documentation with drf-spectacular

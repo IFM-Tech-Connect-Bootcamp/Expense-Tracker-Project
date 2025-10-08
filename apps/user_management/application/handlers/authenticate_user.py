@@ -134,7 +134,7 @@ class AuthenticateUserHandler:
                 auth_result = AuthResultDTO(
                     user=user_dto,
                     access_token=access_token,
-                    expires_in=settings.JWT_SETTINGS['ACCESS_TOKEN_LIFETIME']
+                    expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert minutes to seconds
                 )
                 return auth_result
             except Exception as e:

@@ -59,7 +59,7 @@ class DjangoExpenseRepository(ExpenseRepository):
         try:
             model = ExpenseModel.objects.get(id=expense_id.value)
             expense = expense_model_to_entity(model)
-            logger.debug(f"Found expense: {expense.id.value}")
+            logger.debug(f"Found expense: {expense.expense_id.value}")
             return expense
         except ObjectDoesNotExist:
             logger.debug(f"Expense not found: {expense_id.value}")
@@ -243,6 +243,29 @@ class DjangoExpenseRepository(ExpenseRepository):
             logger.error(f"Error counting expenses for user {user_id.value}: {e}")
             raise ValueError(f"Failed to count expenses: {e}") from e
 
+    def count_by_category(self, category_id: CategoryId) -> int:
+        """Count expenses for a category.
+        
+        Args:
+            category_id: Category identifier.
+            
+        Returns:
+            Number of expenses in the category.
+            
+        Raises:
+            ValueError: If database query fails.
+        """
+        logger.debug(f"Counting expenses for category: {category_id.value}")
+        
+        try:
+            count = ExpenseModel.objects.filter(category_id=category_id.value).count()
+            logger.debug(f"Found {count} expenses for category {category_id.value}")
+            return count
+            
+        except Exception as e:
+            logger.error(f"Error counting expenses for category {category_id.value}: {e}")
+            raise ValueError(f"Failed to count expenses: {e}") from e
+
     def exists_by_id(self, expense_id: ExpenseId) -> bool:
         """Check if expense exists by ID.
         
@@ -279,12 +302,12 @@ class DjangoExpenseRepository(ExpenseRepository):
             ExpenseAlreadyExistsError: If expense with same ID already exists.
             ValueError: If expense data is invalid.
         """
-        logger.debug(f"Saving new expense: {expense.id.value}")
+        logger.debug(f"Saving new expense: {expense.expense_id.value}")
         
         try:
             # Check if expense already exists
-            if self.exists_by_id(expense.id):
-                raise ExpenseAlreadyExistsError(f"Expense with ID {expense.id.value} already exists")
+            if self.exists_by_id(expense.expense_id):
+                raise ExpenseAlreadyExistsError(f"Expense with ID {expense.expense_id.value} already exists")
             
             # Create new model
             model_data = expense_entity_to_model_data(expense)
@@ -300,10 +323,10 @@ class DjangoExpenseRepository(ExpenseRepository):
         except IntegrityError as e:
             logger.error(f"Database integrity error saving expense: {e}")
             if "id" in str(e).lower():
-                raise ExpenseAlreadyExistsError(f"Expense with ID {expense.id.value} already exists")
+                raise ExpenseAlreadyExistsError(f"Expense with ID {expense.expense_id.value} already exists")
             raise ValueError(f"Invalid expense data: {e}")
         except Exception as e:
-            logger.error(f"Error saving expense {expense.id.value}: {e}")
+            logger.error(f"Error saving expense {expense.expense_id.value}: {e}")
             raise
 
     def update(self, expense: Expense) -> Expense:
@@ -319,15 +342,15 @@ class DjangoExpenseRepository(ExpenseRepository):
             ExpenseNotFoundError: If expense doesn't exist.
             ValueError: If update operation fails.
         """
-        logger.debug(f"Updating expense: {expense.id.value}")
+        logger.debug(f"Updating expense: {expense.expense_id.value}")
         
         try:
             # Get existing model
             try:
-                existing_model = ExpenseModel.objects.get(id=expense.id.value)
+                existing_model = ExpenseModel.objects.get(id=expense.expense_id.value)
             except ObjectDoesNotExist:
-                logger.warning(f"Expense not found for update: {expense.id.value}")
-                raise ExpenseNotFoundError(str(expense.id.value))
+                logger.warning(f"Expense not found for update: {expense.expense_id.value}")
+                raise ExpenseNotFoundError(str(expense.expense_id.value))
             
             # Update model with new data
             try:
@@ -340,13 +363,13 @@ class DjangoExpenseRepository(ExpenseRepository):
             # Return updated entity
             updated_expense = expense_model_to_entity(updated_model)
                 
-            logger.info(f"Successfully updated expense: {expense.id.value}")
+            logger.info(f"Successfully updated expense: {expense.expense_id.value}")
             return updated_expense
             
         except (ExpenseNotFoundError,):
             raise
         except Exception as e:
-            logger.error(f"Error updating expense {expense.id.value}: {e}")
+            logger.error(f"Error updating expense {expense.expense_id.value}: {e}")
             raise ValueError(f"Failed to update expense: {e}") from e
 
     def delete(self, expense_id: ExpenseId) -> None:

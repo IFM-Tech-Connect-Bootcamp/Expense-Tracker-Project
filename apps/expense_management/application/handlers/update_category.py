@@ -99,28 +99,22 @@ class UpdateCategoryHandler:
                 logger.debug(f"Checking category name uniqueness for user {command.user_id}: {command.name}")
                 existing_categories = self._category_repository.find_by_user_id(user_id)
                 
-                # Filter out the current category being updated
-                other_categories = [cat for cat in existing_categories if cat.id != category_id]
-                
-                if not CategoryValidationService.is_category_name_unique(
-                    new_category_name, user_id, other_categories
-                ):
-                    logger.warning(f"Category update failed: Category name '{command.name}' already exists for user {command.user_id}")
-                    from ...domain.errors import DuplicateCategoryNameError
-                    raise DuplicateCategoryNameError(f"Category name '{command.name}' already exists for user {command.user_id}")
+                CategoryValidationService.validate_category_name_unique_for_user(
+                    existing_categories, user_id, command.name, exclude_category_id=category_id
+                )
             
             # Step 4: Update the category entity
             logger.debug(f"Updating category {command.category_id} with new name: {command.name}")
-            category.update_name(new_category_name)
+            category.rename(new_category_name)
             
             # Step 5: Persist the updated category
-            logger.debug(f"Persisting updated category {category.id} to repository")
-            self._category_repository.save(category)
+            logger.debug(f"Persisting updated category {category.category_id} to repository")
+            self._category_repository.update(category)
             
             # Step 6: Create category DTO for response
             logger.debug(f"Creating category DTO for successful update of category {command.category_id}")
             category_dto = CategoryDTO(
-                id=str(category.id.value),
+                id=str(category.category_id.value),
                 user_id=str(category.user_id.value),
                 name=category.name.value,
                 created_at=category.created_at,
@@ -128,8 +122,7 @@ class UpdateCategoryHandler:
             )
             
             # Step 7: Collect domain events for publishing
-            events = category.get_domain_events()
-            category.clear_domain_events()
+            events = category.clear_events()
             logger.info(f"Category update completed successfully for category {command.category_id}, collected {len(events)} domain events")
             
             return UpdateCategoryResult(

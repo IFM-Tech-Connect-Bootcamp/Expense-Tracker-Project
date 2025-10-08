@@ -133,13 +133,13 @@ class UpdateExpenseHandler:
             )
             
             # Step 6: Persist the updated expense
-            logger.debug(f"Persisting updated expense {expense.id} to repository")
-            self._expense_repository.save(expense)
+            logger.debug(f"Persisting updated expense {expense.expense_id} to repository")
+            self._expense_repository.update(expense)
             
             # Step 7: Create expense DTO for response
             logger.debug(f"Creating expense DTO for successful update of expense {command.expense_id}")
             expense_dto = ExpenseDTO(
-                id=str(expense.id.value),
+                id=str(expense.expense_id.value),
                 user_id=str(expense.user_id.value),
                 category_id=str(expense.category_id.value),
                 amount_tzs=expense.amount_tzs.value,
@@ -150,8 +150,7 @@ class UpdateExpenseHandler:
             )
             
             # Step 8: Collect domain events for publishing
-            events = expense.get_domain_events()
-            expense.clear_domain_events()
+            events = expense.clear_events()
             logger.info(f"Expense update completed successfully for expense {command.expense_id}, collected {len(events)} domain events")
             
             return UpdateExpenseResult(

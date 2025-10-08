@@ -55,7 +55,7 @@ class DjangoCategoryRepository(CategoryRepository):
         try:
             model = CategoryModel.objects.get(id=category_id.value)
             category = category_model_to_entity(model)
-            logger.debug(f"Found category: {category.id.value}")
+            logger.debug(f"Found category: {category.category_id.value}")
             return category
         except ObjectDoesNotExist:
             logger.debug(f"Category not found: {category_id.value}")
@@ -120,7 +120,7 @@ class DjangoCategoryRepository(CategoryRepository):
             
             if model:
                 category = category_model_to_entity(model)
-                logger.debug(f"Found category: {category.id.value}")
+                logger.debug(f"Found category: {category.category_id.value}")
                 return category
             
             logger.debug(f"No category found for user {user_id.value} with name {name.value}")
@@ -261,15 +261,15 @@ class DjangoCategoryRepository(CategoryRepository):
             CategoryAlreadyExistsError: If name change conflicts with existing category.
             ValueError: If update operation fails.
         """
-        logger.debug(f"Updating category: {category.id.value}")
+        logger.debug(f"Updating category: {category.category_id.value}")
         
         try:
             # Get existing model
             try:
-                existing_model = CategoryModel.objects.get(id=category.id.value)
+                existing_model = CategoryModel.objects.get(id=category.category_id.value)
             except ObjectDoesNotExist:
-                logger.warning(f"Category not found for update: {category.id.value}")
-                raise CategoryNotFoundError(str(category.id.value))
+                logger.warning(f"Category not found for update: {category.category_id.value}")
+                raise CategoryNotFoundError(str(category.category_id.value))
             
             # Check if name change conflicts with existing category
             if existing_model.name != category.name.value:
@@ -293,13 +293,13 @@ class DjangoCategoryRepository(CategoryRepository):
             # Return updated entity
             updated_category = category_model_to_entity(updated_model)
                 
-            logger.info(f"Successfully updated category: {category.id.value}")
+            logger.info(f"Successfully updated category: {category.category_id.value}")
             return updated_category
             
         except (CategoryNotFoundError, CategoryAlreadyExistsError):
             raise
         except Exception as e:
-            logger.error(f"Error updating category {category.id.value}: {e}")
+            logger.error(f"Error updating category {category.category_id.value}: {e}")
             raise ValueError(f"Failed to update category: {e}") from e
 
     def delete(self, category_id: CategoryId) -> None:

@@ -9,6 +9,15 @@ from typing import Optional, TypeVar, Protocol
 from ..domain.repositories.expense_repository import ExpenseRepository
 from ..domain.repositories.category_repository import CategoryRepository
 from ..domain.repositories import TransactionManager
+from ..application.handlers import (
+    CreateExpenseHandler,
+    UpdateExpenseHandler,
+    DeleteExpenseHandler,
+    CreateCategoryHandler,
+    UpdateCategoryHandler,
+    DeleteCategoryHandler,
+    GetExpenseSummaryHandler,
+)
 from .repositories import DjangoExpenseRepository, DjangoCategoryRepository
 from .outbox.writer import OutboxEventWriter, create_outbox_writer
 from .outbox.dispatcher import OutboxDispatcher, create_outbox_dispatcher
@@ -106,6 +115,46 @@ class InfrastructureContainer:
         
         elif service_type == DjangoTransactionManager:
             return create_transaction_manager()
+        
+        # Application layer handlers
+        elif service_type == CreateExpenseHandler:
+            return CreateExpenseHandler(
+                expense_repository=self.get(ExpenseRepository),
+                category_repository=self.get(CategoryRepository)
+            )
+        
+        elif service_type == UpdateExpenseHandler:
+            return UpdateExpenseHandler(
+                expense_repository=self.get(ExpenseRepository),
+                category_repository=self.get(CategoryRepository)
+            )
+        
+        elif service_type == DeleteExpenseHandler:
+            return DeleteExpenseHandler(
+                expense_repository=self.get(ExpenseRepository)
+            )
+        
+        elif service_type == CreateCategoryHandler:
+            return CreateCategoryHandler(
+                category_repository=self.get(CategoryRepository)
+            )
+        
+        elif service_type == UpdateCategoryHandler:
+            return UpdateCategoryHandler(
+                category_repository=self.get(CategoryRepository)
+            )
+        
+        elif service_type == DeleteCategoryHandler:
+            return DeleteCategoryHandler(
+                category_repository=self.get(CategoryRepository),
+                expense_repository=self.get(ExpenseRepository)
+            )
+        
+        elif service_type == GetExpenseSummaryHandler:
+            return GetExpenseSummaryHandler(
+                expense_repository=self.get(ExpenseRepository),
+                category_repository=self.get(CategoryRepository)
+            )
         
         else:
             raise ValueError(f"Unknown service type: {service_type}")

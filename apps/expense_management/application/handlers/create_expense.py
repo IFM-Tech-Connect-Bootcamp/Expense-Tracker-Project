@@ -106,18 +106,17 @@ class CreateExpenseHandler:
                 category_id=category_id,
                 amount_tzs=amount_tzs,
                 description=description,
-                expense_date=command.expense_date,
-                expense_id=ExpenseId.new()
+                expense_date=command.expense_date
             )
             
             # Step 4: Persist the expense
-            logger.debug(f"Persisting expense {expense.id} to repository")
+            logger.debug(f"Persisting expense {expense.expense_id} to repository")
             self._expense_repository.save(expense)
             
             # Step 5: Create expense DTO for response
             logger.debug(f"Creating expense DTO for successful creation by user {command.user_id}")
             expense_dto = ExpenseDTO(
-                id=str(expense.id.value),
+                id=str(expense.expense_id.value),
                 user_id=str(expense.user_id.value),
                 category_id=str(expense.category_id.value),
                 amount_tzs=expense.amount_tzs.value,
@@ -128,8 +127,7 @@ class CreateExpenseHandler:
             )
             
             # Step 6: Collect domain events for publishing
-            events = expense.get_domain_events()
-            expense.clear_domain_events()
+            events = expense.clear_events()
             logger.info(f"Expense creation completed successfully for user {command.user_id}, collected {len(events)} domain events")
             
             return CreateExpenseResult(

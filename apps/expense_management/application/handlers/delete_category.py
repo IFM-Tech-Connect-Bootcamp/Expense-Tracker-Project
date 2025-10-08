@@ -95,23 +95,22 @@ class DeleteCategoryHandler:
             
             # Step 3: Check that category is not in use by expenses
             logger.debug(f"Checking if category {command.category_id} is in use by expenses")
-            expense_count = self._expense_repository.count_by_category_id(category_id)
+            expense_count = self._expense_repository.count_by_category(category_id)
             if expense_count > 0:
                 logger.warning(f"Category deletion failed: Category {command.category_id} is in use by {expense_count} expenses")
                 from ...domain.errors import CategoryInUseError
                 raise CategoryInUseError(f"Category {command.category_id} is in use by {expense_count} expenses")
             
-            # Step 4: Mark category for deletion (generates domain event)
-            logger.debug(f"Marking category {command.category_id} for deletion")
-            category.delete()
+            # Step 4: Generate category deletion domain event
+            logger.debug(f"Generating deletion event for category {command.category_id}")
+            deletion_event = self._create_category_deleted_event(category)
             
             # Step 5: Delete the category from repository
-            logger.debug(f"Deleting category {category.id} from repository")
+            logger.debug(f"Deleting category {category.category_id} from repository")
             self._category_repository.delete(category_id)
             
             # Step 6: Collect domain events for publishing
-            events = category.get_domain_events()
-            category.clear_domain_events()
+            events = [deletion_event]
             logger.info(f"Category deletion completed successfully for category {command.category_id}, collected {len(events)} domain events")
             
             return DeleteCategoryResult(
@@ -125,3 +124,25 @@ class DeleteCategoryHandler:
         except Exception as e:
             logger.error(f"Unexpected error during category deletion for category {command.category_id}: {str(e)}")
             raise CategoryDeleteFailedError(f"Failed to delete category: {str(e)}") from e
+    
+    def _create_category_deleted_event(self, category: Category) -> DomainEvent:
+        """Create category deleted domain event.
+        
+        Args:
+            category: The category being deleted.
+            
+        Returns:
+            CategoryDeleted domain event.
+        """
+        from ...domain.events.category_events import CategoryDeleted
+        from datetime import datetime
+        import uuid
+        
+        return CategoryDeleted(
+            event_id=str(uuid.uuid4()),
+            occurred_at=datetime.now(),
+            aggregate_id=str(category.category_id),
+            event_type="CategoryDeleted",
+            user_id=category.user_id,
+            name=str(category.name)
+        )

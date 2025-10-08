@@ -1,155 +1,224 @@
 """
-API Views for User Management endpoints.
+Views for User Management API endpoints.
 
 This module contains Django REST Framework views that handle HTTP requests
-for user management operations. All views integrate with the application
-layer handlers following clean architecture principles.
+for user management operations including registration, authentication,
+profile management, and account operations.
 """
 
+import logging
+from typing import Dict, Any
+from datetime import datetime
+
+from django.http import JsonResponse
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
-from django.conf import settings
 from drf_spectacular.utils import extend_schema, OpenApiResponse
-from django.http import JsonResponse
-import logging
-from typing import Dict, Any
 
+from shared.response_standards import (
+    StandardResponseBuilder,
+    StandardErrorCodes,
+    CommonMessages,
+    HealthCheckResponse
+)
 from .serializers import (
     RegisterUserSerializer,
     AuthenticateUserSerializer,
-    ChangePasswordSerializer,
     UpdateProfileSerializer,
-    DeactivateUserSerializer,
+    ChangePasswordSerializer,
     UserResponseSerializer,
     AuthResponseSerializer,
     ErrorResponseSerializer,
     SuccessResponseSerializer,
 )
-from .authentication import get_current_user_from_request
 from ..application.handlers import (
     RegisterUserHandler,
     AuthenticateUserHandler,
-    ChangePasswordHandler,
     UpdateProfileHandler,
+    ChangePasswordHandler,
     DeactivateUserHandler,
 )
 from ..application.commands import (
     RegisterUserCommand,
     AuthenticateUserCommand,
-    ChangePasswordCommand,
     UpdateProfileCommand,
+    ChangePasswordCommand,
     DeactivateUserCommand,
 )
 from ..application.dto import UserDTO, AuthResultDTO
 from ..infrastructure.container import InfrastructureContainer
-from ..infrastructure.outbox.writer import write_domain_event
 from ..domain.repositories.user_repository import UserRepository
 from ..domain.services.password_policy import PasswordHasher, TokenProvider
-from ..domain.errors import (
-    UserAlreadyExistsError,
-    UserNotFoundError,
-    InvalidCredentialsError,
-    InvalidOperationError,
-    PasswordPolicyError,
-    UserDeactivatedError,
-    DomainValidationError,
-)
 from ..application.errors import (
-    ApplicationError,
     AuthenticationFailedError,
-    ValidationError,
+    UserNotFoundError as AppUserNotFoundError,
     RegistrationFailedError,
     ProfileUpdateFailedError,
     PasswordChangeFailedError,
     UserDeactivationFailedError,
-    UserNotFoundError as AppUserNotFoundError,
+    ValidationError as AppValidationError,
 )
-
+from ..domain.errors import (
+    UserAlreadyExistsError,
+    UserNotFoundError,
+    InvalidCredentialsError,
+    UserDeactivatedError,
+    InvalidOperationError,
+    PasswordPolicyError,
+    DomainValidationError,
+)
+from .authentication import get_current_user_from_request
 
 logger = logging.getLogger(__name__)
 
 
-def _publish_domain_events(events):
+def get_current_user_id_from_request(request: Request) -> str:
     """
-    Publish domain events to the outbox for reliable delivery.
+    Extract the current authenticated user ID from request.
     
     Args:
-        events: List of domain events to publish
+        request: Django REST request object
+        
+    Returns:
+        Current user ID as string
+        
+    Raises:
+        AuthenticationFailedError: If user is not authenticated
     """
-    try:
-        logger.info(f"Publishing {len(events)} domain events to outbox")
-        for event in events:
-            logger.debug(f"Publishing event: {event.__class__.__name__}")
-            write_domain_event(event, use_transaction_commit=False)
-        logger.info(f"Successfully published {len(events)} domain events to outbox")
-    except Exception as e:
-        logger.error(f"Failed to publish domain events: {str(e)}", exc_info=True)
-        # Don't raise - event publishing failure shouldn't break the main flow
+    user_entity = get_current_user_from_request(request)
+    if not user_entity:
+        raise AuthenticationFailedError("User not authenticated")
+    return str(user_entity.id.value)
 
 
 def _handle_domain_errors(error: Exception) -> Response:
     """
-    Convert domain and application errors to appropriate HTTP responses.
+    Convert domain and application errors to standardized HTTP responses.
     
     Args:
         error: Domain or application exception to convert
         
     Returns:
-        HTTP response with appropriate status code and error message
+        HTTP response with standardized format and appropriate status code
     """
-    # Handle application errors first
+    logger.debug(f"Handling domain error: {type(error).__name__}: {str(error)}")
+    
+    # Handle application errors with specific mappings
     if isinstance(error, AuthenticationFailedError):
-        return Response(
-            {"error": str(error), "code": "INVALID_CREDENTIALS"},
-            status=status.HTTP_401_UNAUTHORIZED
+        response_data = StandardResponseBuilder.error(
+            message="Authentication failed: Invalid email or password",
+            code=StandardErrorCodes.INVALID_CREDENTIALS
         )
+        return Response(response_data, status=status.HTTP_401_UNAUTHORIZED)
+        
     elif isinstance(error, AppUserNotFoundError):
-        return Response(
-            {"error": str(error), "code": "USER_NOT_FOUND"},
-            status=status.HTTP_404_NOT_FOUND
+        response_data = StandardResponseBuilder.error(
+            message="User account not found",
+            code=StandardErrorCodes.USER_NOT_FOUND
         )
-    elif isinstance(error, ValidationError):
-        return Response(
-            {"error": str(error), "code": "VALIDATION_ERROR"},
-            status=status.HTTP_400_BAD_REQUEST
+        return Response(response_data, status=status.HTTP_404_NOT_FOUND)
+        
+    elif isinstance(error, (AppValidationError, DomainValidationError)):
+        response_data = StandardResponseBuilder.error(
+            message=str(error),
+            code=StandardErrorCodes.VALIDATION_ERROR
         )
-    elif isinstance(error, (RegistrationFailedError, ProfileUpdateFailedError, 
-                           PasswordChangeFailedError, UserDeactivationFailedError)):
-        return Response(
-            {"error": str(error), "code": "OPERATION_FAILED"},
-            status=status.HTTP_400_BAD_REQUEST
+        return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+        
+    elif isinstance(error, RegistrationFailedError):
+        # Check if it's a duplicate email error
+        if "already exists" in str(error).lower() or "already registered" in str(error).lower():
+            response_data = StandardResponseBuilder.error(
+                message="Email address is already registered",
+                code=StandardErrorCodes.EMAIL_ALREADY_REGISTERED
+            )
+            return Response(response_data, status=status.HTTP_409_CONFLICT)
+        else:
+            response_data = StandardResponseBuilder.error(
+                message="User registration failed",
+                code=StandardErrorCodes.REGISTRATION_FAILED,
+                details={"reason": str(error)}
+            )
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+            
+    elif isinstance(error, ProfileUpdateFailedError):
+        response_data = StandardResponseBuilder.error(
+            message="Profile update failed",
+            code=StandardErrorCodes.PROFILE_UPDATE_FAILED,
+            details={"reason": str(error)}
         )
+        return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+        
+    elif isinstance(error, PasswordChangeFailedError):
+        response_data = StandardResponseBuilder.error(
+            message="Password change failed",
+            code=StandardErrorCodes.PASSWORD_CHANGE_FAILED,
+            details={"reason": str(error)}
+        )
+        return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+        
+    elif isinstance(error, UserDeactivationFailedError):
+        response_data = StandardResponseBuilder.error(
+            message="User deactivation failed",
+            code=StandardErrorCodes.USER_DEACTIVATION_FAILED,
+            details={"reason": str(error)}
+        )
+        return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
     
-    # Handle domain errors (legacy fallback)
-    error_mappings = {
-        UserAlreadyExistsError: (status.HTTP_409_CONFLICT, "USER_ALREADY_EXISTS"),
-        UserNotFoundError: (status.HTTP_404_NOT_FOUND, "USER_NOT_FOUND"),
-        InvalidCredentialsError: (status.HTTP_401_UNAUTHORIZED, "INVALID_CREDENTIALS"),
-        UserDeactivatedError: (status.HTTP_403_FORBIDDEN, "USER_DEACTIVATED"),
-        InvalidOperationError: (status.HTTP_400_BAD_REQUEST, "INVALID_OPERATION"),
-        PasswordPolicyError: (status.HTTP_400_BAD_REQUEST, "PASSWORD_POLICY_VIOLATION"),
-        DomainValidationError: (status.HTTP_400_BAD_REQUEST, "VALIDATION_ERROR"),
-    }
+    # Handle domain errors (legacy support)
+    elif isinstance(error, UserAlreadyExistsError):
+        response_data = StandardResponseBuilder.error(
+            message="Email address is already registered",
+            code=StandardErrorCodes.EMAIL_ALREADY_REGISTERED
+        )
+        return Response(response_data, status=status.HTTP_409_CONFLICT)
+        
+    elif isinstance(error, UserNotFoundError):
+        response_data = StandardResponseBuilder.error(
+            message="User account not found",
+            code=StandardErrorCodes.USER_NOT_FOUND
+        )
+        return Response(response_data, status=status.HTTP_404_NOT_FOUND)
+        
+    elif isinstance(error, InvalidCredentialsError):
+        response_data = StandardResponseBuilder.error(
+            message="Authentication failed: Invalid email or password",
+            code=StandardErrorCodes.INVALID_CREDENTIALS
+        )
+        return Response(response_data, status=status.HTTP_401_UNAUTHORIZED)
+        
+    elif isinstance(error, UserDeactivatedError):
+        response_data = StandardResponseBuilder.error(
+            message="User account has been deactivated",
+            code=StandardErrorCodes.USER_DEACTIVATED
+        )
+        return Response(response_data, status=status.HTTP_403_FORBIDDEN)
+        
+    elif isinstance(error, InvalidOperationError):
+        response_data = StandardResponseBuilder.error(
+            message="The requested operation is not allowed",
+            code=StandardErrorCodes.OPERATION_NOT_ALLOWED
+        )
+        return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+        
+    elif isinstance(error, PasswordPolicyError):
+        response_data = StandardResponseBuilder.error(
+            message=str(error),
+            code=StandardErrorCodes.PASSWORD_POLICY_VIOLATION
+        )
+        return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
     
-    status_code, error_code = error_mappings.get(
-        type(error), 
-        (status.HTTP_500_INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-    )
-    
-    error_data = {
-        "error": str(error),
-        "code": error_code,
-    }
-    
-    if hasattr(error, 'details') and error.details:
-        error_data["details"] = error.details
-    
-    return Response(error_data, status=status_code)
+    # Generic error handling
+    else:
+        logger.error(f"Unexpected error in user management API: {str(error)}")
+        response_data = StandardResponseBuilder.error(
+            message="An unexpected error occurred",
+            code=StandardErrorCodes.INTERNAL_ERROR
+        )
+        return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def _create_user_response_data(user_dto) -> Dict[str, Any]:
@@ -157,27 +226,26 @@ def _create_user_response_data(user_dto) -> Dict[str, Any]:
     Create user response data from DTO.
     
     Args:
-        user_dto: User DTO from application layer
+        user_dto: User DTO containing user information
         
     Returns:
         Dictionary with user data for response
     """
     return {
-        "id": str(user_dto.id),
+        "id": user_dto.id,
         "email": user_dto.email,
         "first_name": user_dto.first_name,
         "last_name": user_dto.last_name,
-        "full_name": f"{user_dto.first_name} {user_dto.last_name}",
+        "full_name": user_dto.full_name,
         "status": user_dto.status,
-        "created_at": user_dto.created_at.isoformat() if user_dto.created_at else None,
-        "updated_at": user_dto.updated_at.isoformat() if user_dto.updated_at else None,
+        "created_at": user_dto.created_at,
+        "updated_at": user_dto.updated_at,
     }
 
 
 @extend_schema(
-    operation_id="register_user",
-    summary="Register a new user",
-    description="Create a new user account with email, password, and personal information.",
+    summary="Register new user",
+    description="Create a new user account with email, password, and profile information",
     request=RegisterUserSerializer,
     responses={
         201: OpenApiResponse(
@@ -186,79 +254,74 @@ def _create_user_response_data(user_dto) -> Dict[str, Any]:
         ),
         400: OpenApiResponse(
             response=ErrorResponseSerializer,
-            description="Validation error or password policy violation"
+            description="Invalid request data"
         ),
         409: OpenApiResponse(
             response=ErrorResponseSerializer,
-            description="User with this email already exists"
+            description="Email already registered"
         ),
     },
-    tags=["Authentication"]
+    tags=["authentication"],
 )
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@csrf_exempt
 def register_user(request: Request) -> Response:
-    """
-    Register a new user account.
+    """Register a new user account."""
+    logger.info("Processing user registration request")
     
-    Creates a new user with the provided email, password, and personal information.
-    The email must be unique and the password must meet policy requirements.
-    """
     try:
         # Validate request data
         serializer = RegisterUserSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(
-                {"error": "Validation failed", "details": serializer.errors},
-                status=status.HTTP_400_BAD_REQUEST
+            logger.warning(f"User registration validation failed: {serializer.errors}")
+            field_errors = {field: [str(error) for error in errors] 
+                          for field, errors in serializer.errors.items()}
+            response_data = StandardResponseBuilder.validation_error(
+                message="Registration data validation failed",
+                field_errors=field_errors
             )
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create command
-        register_command = RegisterUserCommand(
-            email=serializer.validated_data['email'],
-            password=serializer.validated_data['password'],
-            first_name=serializer.validated_data['first_name'],
-            last_name=serializer.validated_data['last_name'],
-        )
-        
-        # Execute use case
+        # Execute registration through handler
         container = InfrastructureContainer()
         handler = RegisterUserHandler(
             user_repository=container.get(UserRepository),
             password_service=container.get(PasswordHasher),
         )
         
-        user_result = handler.handle(register_command)
-        user_dto = user_result.user_dto
-        
-        # Publish domain events to outbox
-        if hasattr(user_result, 'events') and user_result.events:
-            _publish_domain_events(user_result.events)
-        
-        # Return response
-        user_data = _create_user_response_data(user_dto)
-        return Response(user_data, status=status.HTTP_201_CREATED)
-        
-    except (UserAlreadyExistsError, PasswordPolicyError, DomainValidationError) as e:
-        return _handle_domain_errors(e)
-    except Exception as e:
-        logger.error(f"Unexpected error in register_user: {str(e)}")
-        return Response(
-            {"error": "Internal server error", "code": "INTERNAL_ERROR"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        command = RegisterUserCommand(
+            email=serializer.validated_data['email'],
+            password=serializer.validated_data['password'],
+            first_name=serializer.validated_data['first_name'],
+            last_name=serializer.validated_data['last_name'],
         )
+        
+        result = handler.handle(command)
+        user_dto = result.user_dto
+        
+        # Create successful response
+        user_data = _create_user_response_data(user_dto)
+        response_data = StandardResponseBuilder.created(
+            data=user_data,
+            message=CommonMessages.USER_REGISTERED
+        )
+        
+        logger.info(f"User registration completed successfully for email: {user_dto.email}")
+        return Response(response_data, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        logger.error(f"Error during user registration: {str(e)}")
+        return _handle_domain_errors(e)
 
 
 @extend_schema(
-    operation_id="authenticate_user",
     summary="Authenticate user",
-    description="Authenticate user credentials and return access token.",
+    description="Authenticate user with email and password, returning JWT access token",
     request=AuthenticateUserSerializer,
     responses={
         200: OpenApiResponse(
             response=AuthResponseSerializer,
-            description="Authentication successful"
+            description="User authenticated successfully"
         ),
         401: OpenApiResponse(
             response=ErrorResponseSerializer,
@@ -266,37 +329,31 @@ def register_user(request: Request) -> Response:
         ),
         403: OpenApiResponse(
             response=ErrorResponseSerializer,
-            description="User account is deactivated"
+            description="User account deactivated"
         ),
     },
-    tags=["Authentication"]
+    tags=["authentication"],
 )
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@csrf_exempt
 def authenticate_user(request: Request) -> Response:
-    """
-    Authenticate user credentials and return access token.
+    """Authenticate user and return JWT token."""
+    logger.info("Processing user authentication request")
     
-    Validates the provided email and password, and returns a JWT token
-    if authentication is successful.
-    """
     try:
         # Validate request data
         serializer = AuthenticateUserSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(
-                {"error": "Validation failed", "details": serializer.errors},
-                status=status.HTTP_400_BAD_REQUEST
+            logger.warning(f"User authentication validation failed: {serializer.errors}")
+            field_errors = {field: [str(error) for error in errors] 
+                          for field, errors in serializer.errors.items()}
+            response_data = StandardResponseBuilder.validation_error(
+                message="Login data validation failed",
+                field_errors=field_errors
             )
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create command
-        auth_command = AuthenticateUserCommand(
-            email=serializer.validated_data['email'],
-            password=serializer.validated_data['password'],
-        )
-        
-        # Execute use case
+        # Execute authentication through handler
         container = InfrastructureContainer()
         handler = AuthenticateUserHandler(
             user_repository=container.get(UserRepository),
@@ -304,35 +361,38 @@ def authenticate_user(request: Request) -> Response:
             token_provider=container.get(TokenProvider),
         )
         
-        auth_result = handler.handle(auth_command)
+        command = AuthenticateUserCommand(
+            email=serializer.validated_data['email'],
+            password=serializer.validated_data['password']
+        )
         
-        # Return response
+        auth_result = handler.handle(command)
+        
+        # Create successful response
         user_data = _create_user_response_data(auth_result.user)
-        response_data = {
+        auth_data = {
             "user": user_data,
             "access_token": auth_result.access_token,
             "token_type": "Bearer",
-            "expires_in": settings.JWT_SETTINGS['ACCESS_TOKEN_LIFETIME'],
+            "expires_in": auth_result.expires_in or 3600  # Use from DTO or default 1 hour
         }
         
+        response_data = StandardResponseBuilder.success(
+            data=auth_data,
+            message=CommonMessages.USER_AUTHENTICATED
+        )
+        
+        logger.info(f"User authentication completed successfully for email: {auth_result.user.email}")
         return Response(response_data, status=status.HTTP_200_OK)
         
-    except (InvalidCredentialsError, UserNotFoundError, UserDeactivatedError) as e:
-        return _handle_domain_errors(e)
-    except (AuthenticationFailedError, AppUserNotFoundError, ValidationError, ApplicationError) as e:
-        return _handle_domain_errors(e)
     except Exception as e:
-        logger.error(f"Unexpected error in authenticate_user: {str(e)}")
-        return Response(
-            {"error": "Internal server error", "code": "INTERNAL_ERROR"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        logger.error(f"Error during user authentication: {str(e)}")
+        return _handle_domain_errors(e)
 
 
 @extend_schema(
-    operation_id="get_current_user",
     summary="Get current user profile",
-    description="Retrieve the profile information of the authenticated user.",
+    description="Retrieve the authenticated user's profile information",
     responses={
         200: OpenApiResponse(
             response=UserResponseSerializer,
@@ -342,52 +402,65 @@ def authenticate_user(request: Request) -> Response:
             response=ErrorResponseSerializer,
             description="Authentication required"
         ),
+        404: OpenApiResponse(
+            response=ErrorResponseSerializer,
+            description="User not found"
+        ),
     },
-    tags=["User Profile"]
+    tags=["profile"],
 )
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_current_user(request: Request) -> Response:
-    """
-    Get the authenticated user's profile.
+    """Get current authenticated user's profile."""
+    logger.info("Processing get current user request")
     
-    Returns the profile information for the currently authenticated user.
-    """
     try:
-        # Get the authenticated user from the request
-        current_user = get_current_user_from_request(request)
-        if not current_user:
-            return Response(
-                {"error": "User not found", "code": "USER_NOT_FOUND"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get authenticated user ID
+        user_id = get_current_user_id_from_request(request)
         
-        # Create user response data
-        user_data = _create_user_response_data(UserDTO(
-            id=str(current_user.id.value),
-            email=current_user.email.value,
-            first_name=current_user.first_name.value,
-            last_name=current_user.last_name.value,
-            full_name=f"{current_user.first_name.value} {current_user.last_name.value}",
-            status=current_user.status.value,
-            created_at=current_user.created_at,
-            updated_at=current_user.updated_at
-        ))
+        # Get user directly through repository
+        container = InfrastructureContainer()
+        user_repository = container.get(UserRepository)
         
-        return Response(user_data, status=status.HTTP_200_OK)
+        from ..domain.value_objects.user_id import UserId
+        user_id_vo = UserId.from_string(user_id)
+        user_entity = user_repository.find_by_id(user_id_vo)
+        
+        if not user_entity:
+            from ..domain.errors import UserNotFoundError
+            raise UserNotFoundError(f"User with ID {user_id} not found")
+        
+        # Convert to DTO
+        user_dto = UserDTO(
+            id=str(user_entity.id.value),
+            email=user_entity.email.value,
+            first_name=user_entity.first_name.value,
+            last_name=user_entity.last_name.value,
+            full_name=f"{user_entity.first_name.value} {user_entity.last_name.value}",
+            status=user_entity.status.value,
+            created_at=user_entity.created_at,
+            updated_at=user_entity.updated_at,
+        )
+        
+        # Create successful response
+        user_data = _create_user_response_data(user_dto)
+        response_data = StandardResponseBuilder.success(
+            data=user_data,
+            message=CommonMessages.USER_PROFILE_RETRIEVED
+        )
+        
+        logger.info(f"User profile retrieved successfully for user: {user_id}")
+        return Response(response_data, status=status.HTTP_200_OK)
         
     except Exception as e:
-        logger.error(f"Unexpected error in get_current_user: {str(e)}")
-        return Response(
-            {"error": "Internal server error", "code": "INTERNAL_ERROR"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        logger.error(f"Error retrieving user profile: {str(e)}")
+        return _handle_domain_errors(e)
 
 
 @extend_schema(
-    operation_id="update_profile",
     summary="Update user profile",
-    description="Update the authenticated user's profile information.",
+    description="Update the authenticated user's profile information",
     request=UpdateProfileSerializer,
     responses={
         200: OpenApiResponse(
@@ -396,83 +469,72 @@ def get_current_user(request: Request) -> Response:
         ),
         400: OpenApiResponse(
             response=ErrorResponseSerializer,
-            description="Validation error"
+            description="Invalid request data"
         ),
         401: OpenApiResponse(
             response=ErrorResponseSerializer,
             description="Authentication required"
         ),
-        409: OpenApiResponse(
-            response=ErrorResponseSerializer,
-            description="Email already in use by another user"
-        ),
     },
-    tags=["User Profile"]
+    tags=["profile"],
 )
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_profile(request: Request) -> Response:
-    """
-    Update the authenticated user's profile.
+    """Update authenticated user's profile."""
+    logger.info("Processing profile update request")
     
-    Updates the user's email, first name, and/or last name.
-    At least one field must be provided for update.
-    """
     try:
-        # Get the authenticated user from the request
-        current_user = get_current_user_from_request(request)
-        if not current_user:
-            return Response(
-                {"error": "User not found", "code": "USER_NOT_FOUND"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get authenticated user ID
+        user_id = get_current_user_id_from_request(request)
         
         # Validate request data
         serializer = UpdateProfileSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(
-                {"error": "Validation failed", "details": serializer.errors},
-                status=status.HTTP_400_BAD_REQUEST
+            logger.warning(f"Profile update validation failed: {serializer.errors}")
+            field_errors = {field: [str(error) for error in errors] 
+                          for field, errors in serializer.errors.items()}
+            response_data = StandardResponseBuilder.validation_error(
+                message="Profile update data validation failed",
+                field_errors=field_errors
             )
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create command
-        update_command = UpdateProfileCommand(
-            user_id=str(current_user.id.value),  # Convert UserId to string
-            new_email=serializer.validated_data.get('email'),
-            new_first_name=serializer.validated_data.get('first_name'),
-            new_last_name=serializer.validated_data.get('last_name'),
-        )
-        
-        # Execute use case using proper handler
+        # Execute profile update through handler
+        from ..application.handlers.update_profile import UpdateProfileHandler
         container = InfrastructureContainer()
         handler = UpdateProfileHandler(
             user_repository=container.get(UserRepository),
         )
         
-        update_result = handler.handle(update_command)
-        
-        # Publish domain events to outbox
-        if hasattr(update_result, 'events') and update_result.events:
-            _publish_domain_events(update_result.events)
-        
-        # Return response
-        user_data = _create_user_response_data(update_result.user_dto)
-        return Response(user_data, status=status.HTTP_200_OK)
-        
-    except (UserNotFoundError, UserAlreadyExistsError, DomainValidationError) as e:
-        return _handle_domain_errors(e)
-    except Exception as e:
-        logger.error(f"Unexpected error in update_profile: {str(e)}")
-        return Response(
-            {"error": "Internal server error", "code": "INTERNAL_ERROR"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        # Create command
+        command = UpdateProfileCommand(
+            user_id=user_id,
+            new_first_name=serializer.validated_data.get('first_name'),
+            new_last_name=serializer.validated_data.get('last_name'),
         )
+        
+        # Execute handler
+        result = handler.handle(command)
+        
+        # Create successful response
+        user_data = _create_user_response_data(result.user_dto)
+        response_data = StandardResponseBuilder.updated(
+            data=user_data,
+            message=CommonMessages.USER_PROFILE_UPDATED
+        )
+        
+        logger.info(f"Profile update completed successfully for user: {user_id}")
+        return Response(response_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error updating profile: {str(e)}")
+        return _handle_domain_errors(e)
 
 
 @extend_schema(
-    operation_id="change_password",
-    summary="Change user password",
-    description="Change the authenticated user's password.",
+    summary="Change password",
+    description="Change the authenticated user's password",
     request=ChangePasswordSerializer,
     responses={
         200: OpenApiResponse(
@@ -481,81 +543,71 @@ def update_profile(request: Request) -> Response:
         ),
         400: OpenApiResponse(
             response=ErrorResponseSerializer,
-            description="Validation error or password policy violation"
+            description="Invalid request data"
         ),
         401: OpenApiResponse(
             response=ErrorResponseSerializer,
             description="Authentication required or invalid current password"
         ),
     },
-    tags=["User Profile"]
+    tags=["profile"],
 )
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def change_password(request: Request) -> Response:
-    """
-    Change the authenticated user's password.
+    """Change authenticated user's password."""
+    logger.info("Processing password change request")
     
-    Validates the current password and updates it with a new one
-    that meets the password policy requirements.
-    """
     try:
-        current_user = get_current_user_from_request(request)
-        if not current_user:
-            return Response(
-                {"error": "User not found", "code": "USER_NOT_FOUND"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get authenticated user ID
+        user_id = get_current_user_id_from_request(request)
         
         # Validate request data
         serializer = ChangePasswordSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(
-                {"error": "Validation failed", "details": serializer.errors},
-                status=status.HTTP_400_BAD_REQUEST
+            logger.warning(f"Password change validation failed: {serializer.errors}")
+            field_errors = {field: [str(error) for error in errors] 
+                          for field, errors in serializer.errors.items()}
+            response_data = StandardResponseBuilder.validation_error(
+                message="Password change data validation failed",
+                field_errors=field_errors
             )
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create command
-        change_password_command = ChangePasswordCommand(
-            user_id=str(current_user.id.value),  # Convert UserId to string
-            old_password=serializer.validated_data['old_password'],
-            new_password=serializer.validated_data['new_password'],
-        )
-        
-        # Execute use case
+        # Execute password change through handler
+        from ..application.handlers.change_password import ChangePasswordHandler
         container = InfrastructureContainer()
         handler = ChangePasswordHandler(
             user_repository=container.get(UserRepository),
             password_service=container.get(PasswordHasher),
         )
         
-        change_result = handler.handle(change_password_command)
-        
-        # Publish domain events to outbox
-        if hasattr(change_result, 'events') and change_result.events:
-            _publish_domain_events(change_result.events)
-        
-        # Return success response
-        return Response(
-            {"message": "Password changed successfully"},
-            status=status.HTTP_200_OK
+        # Create command
+        command = ChangePasswordCommand(
+            user_id=user_id,
+            old_password=serializer.validated_data['old_password'],
+            new_password=serializer.validated_data['new_password']
         )
         
-    except (UserNotFoundError, InvalidCredentialsError, PasswordPolicyError) as e:
-        return _handle_domain_errors(e)
+        # Execute handler
+        result = handler.handle(command)
+        
+        # Create successful response
+        response_data = StandardResponseBuilder.success(
+            message=CommonMessages.PASSWORD_CHANGED
+        )
+        
+        logger.info(f"Password change completed successfully for user: {user_id}")
+        return Response(response_data, status=status.HTTP_200_OK)
+        
     except Exception as e:
-        logger.error(f"Unexpected error in change_password: {str(e)}")
-        return Response(
-            {"error": "Internal server error", "code": "INTERNAL_ERROR"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        logger.error(f"Error changing password: {str(e)}")
+        return _handle_domain_errors(e)
 
 
 @extend_schema(
-    operation_id="deactivate_user",
     summary="Deactivate user account",
-    description="Deactivate the authenticated user's account.",
-    request=DeactivateUserSerializer,
+    description="Deactivate the authenticated user's account",
     responses={
         200: OpenApiResponse(
             response=SuccessResponseSerializer,
@@ -565,88 +617,86 @@ def change_password(request: Request) -> Response:
             response=ErrorResponseSerializer,
             description="Authentication required"
         ),
-        400: OpenApiResponse(
-            response=ErrorResponseSerializer,
-            description="Invalid operation"
-        ),
     },
-    tags=["User Profile"]
+    tags=["profile"],
 )
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def deactivate_user(request: Request) -> Response:
-    """
-    Deactivate the authenticated user's account.
+    """Deactivate authenticated user's account."""
+    logger.info("Processing user deactivation request")
     
-    Marks the user's account as deactivated, preventing future logins.
-    This operation cannot be undone by the user.
-    """
     try:
-        current_user = get_current_user_from_request(request)
-        if not current_user:
-            return Response(
-                {"error": "User not found", "code": "USER_NOT_FOUND"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Get authenticated user ID
+        user_id = get_current_user_id_from_request(request)
         
-        # Validate request data (reason is optional)
-        serializer = DeactivateUserSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(
-                {"error": "Validation failed", "details": serializer.errors},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Create command
-        deactivate_command = DeactivateUserCommand(
-            user_id=str(current_user.id.value),  # Convert UserId to string
-            reason=serializer.validated_data.get('reason'),
-        )
-        
-        # Execute use case
+        # Execute deactivation through handler
+        from ..application.handlers.deactivate_user import DeactivateUserHandler
         container = InfrastructureContainer()
         handler = DeactivateUserHandler(
             user_repository=container.get(UserRepository),
         )
         
-        deactivate_result = handler.handle(deactivate_command)
+        # Create command
+        command = DeactivateUserCommand(user_id=user_id)
         
-        # Publish domain events
-        _publish_domain_events(deactivate_result.events)
+        # Execute handler
+        result = handler.handle(command)
         
-        # Return success response
-        return Response(
-            {"message": "Account deactivated successfully"},
-            status=status.HTTP_200_OK
+        # Create successful response
+        response_data = StandardResponseBuilder.success(
+            message=CommonMessages.USER_DEACTIVATED
         )
         
-    except (UserNotFoundError, InvalidOperationError) as e:
-        return _handle_domain_errors(e)
+        logger.info(f"User deactivation completed successfully for user: {user_id}")
+        return Response(response_data, status=status.HTTP_200_OK)
+        
     except Exception as e:
-        logger.error(f"Unexpected error in deactivate_user: {str(e)}")
-        return Response(
-            {"error": "Internal server error", "code": "INTERNAL_ERROR"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        logger.error(f"Error deactivating user: {str(e)}")
+        return _handle_domain_errors(e)
 
 
+@extend_schema(
+    summary="User management health check",
+    description="Check the health status of the user management service",
+    responses={
+        200: OpenApiResponse(
+            description="Service is healthy"
+        ),
+    },
+    tags=["health"],
+)
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def user_health_check(request: Request) -> Response:
-    """Simple health check for user management API."""
+    """Health check endpoint for user management service."""
     try:
+        # Test container availability
         container = InfrastructureContainer()
-        # Simple test to verify container works
-        user_repo = container.get(UserRepository)
         
-        return Response({
-            "status": "healthy",
-            "service": "user-management-api", 
-            "message": "User management API is operational",
-            "container": "initialized successfully"
-        }, status=status.HTTP_200_OK)
+        # Build health response
+        health_data = HealthCheckResponse.healthy(
+            service_name="user_management",
+            version="1.0.0",
+            handlers=[
+                "RegisterUserHandler",
+                "AuthenticateUserHandler",
+                "UpdateProfileHandler",
+                "ChangePasswordHandler",
+                "DeactivateUserHandler"
+            ]
+        )
+        health_data["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        
+        return JsonResponse(health_data, status=200)
+        
     except Exception as e:
-        return Response({
-            "status": "unhealthy", 
-            "error": str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.error(f"Health check failed: {str(e)}")
+        health_data = HealthCheckResponse.unhealthy(
+            service_name="user_management",
+            errors=[str(e)],
+            version="1.0.0"
+        )
+        health_data["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        
+        return JsonResponse(health_data, status=503)

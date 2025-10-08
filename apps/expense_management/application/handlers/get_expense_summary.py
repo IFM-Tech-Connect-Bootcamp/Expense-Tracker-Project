@@ -99,7 +99,7 @@ class GetExpenseSummaryHandler:
             # Step 3: Fetch user's categories for summary enrichment
             logger.debug(f"Fetching categories for user {command.user_id}")
             categories = self._category_repository.find_by_user_id(user_id)
-            category_map = {cat.id: cat for cat in categories}
+            category_map = {str(cat.category_id.value): cat for cat in categories}
             
             # Step 4: Calculate overall totals using domain service
             logger.debug(f"Calculating expense totals for {len(expenses)} expenses")
@@ -110,7 +110,7 @@ class GetExpenseSummaryHandler:
             # Step 5: Build category-wise summaries
             logger.debug(f"Building category summaries")
             category_totals = ExpenseSummaryService.calculate_total_by_category(expenses)
-            category_counts = ExpenseSummaryService.count_expenses_by_category(expenses)
+            category_counts = ExpenseSummaryService.get_expense_count_by_category(expenses)
             
             category_summaries: List[CategorySummaryDTO] = []
             for category_id_val, total_amount_val in category_totals.items():
@@ -121,7 +121,7 @@ class GetExpenseSummaryHandler:
                     average_for_category = total_amount_val.value / expense_count
                     
                     category_summary = CategorySummaryDTO(
-                        category_id=str(category_id_val.value),
+                        category_id=str(category_id_val),
                         category_name=category.name.value,
                         total_amount_tzs=total_amount_val.value,
                         expense_count=expense_count,

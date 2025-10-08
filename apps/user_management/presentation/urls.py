@@ -23,7 +23,7 @@ from .views import (
 urlpatterns = [
     # Health check
     path('health/', user_health_check, name='user_health_check'),
-    
+
     # Authentication endpoints
     path('auth/register/', register_user, name='register_user'),
     path('auth/login/', authenticate_user, name='authenticate_user'),

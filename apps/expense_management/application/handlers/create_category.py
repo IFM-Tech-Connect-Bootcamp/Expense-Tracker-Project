@@ -83,29 +83,25 @@ class CreateCategoryHandler:
             logger.debug(f"Checking category name uniqueness for user {command.user_id}: {command.name}")
             existing_categories = self._category_repository.find_by_user_id(user_id)
             
-            if not CategoryValidationService.is_category_name_unique(
-                category_name, user_id, existing_categories
-            ):
-                logger.warning(f"Category creation failed: Category name '{command.name}' already exists for user {command.user_id}")
-                from ...domain.errors import DuplicateCategoryNameError
-                raise DuplicateCategoryNameError(f"Category name '{command.name}' already exists for user {command.user_id}")
+            CategoryValidationService.validate_category_name_unique_for_user(
+                existing_categories, user_id, command.name
+            )
             
             # Step 3: Create new category domain entity
             logger.debug(f"Creating new category entity for user {command.user_id}")
             category = Category.create(
                 user_id=user_id,
-                name=category_name,
-                category_id=CategoryId.new()
+                name=category_name
             )
             
             # Step 4: Persist the category
-            logger.debug(f"Persisting category {category.id} to repository")
+            logger.debug(f"Persisting category {category.category_id} to repository")
             self._category_repository.save(category)
             
             # Step 5: Create category DTO for response
             logger.debug(f"Creating category DTO for successful creation by user {command.user_id}")
             category_dto = CategoryDTO(
-                id=str(category.id.value),
+                id=str(category.category_id.value),
                 user_id=str(category.user_id.value),
                 name=category.name.value,
                 created_at=category.created_at,
@@ -113,8 +109,7 @@ class CreateCategoryHandler:
             )
             
             # Step 6: Collect domain events for publishing
-            events = category.get_domain_events()
-            category.clear_domain_events()
+            events = category.clear_events()
             logger.info(f"Category creation completed successfully for user {command.user_id}, collected {len(events)} domain events")
             
             return CreateCategoryResult(

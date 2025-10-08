@@ -37,6 +37,7 @@ def api_root(request):
             'admin': '/admin/',
             'api': {
                 'user_management': '/api/v1/users/',
+                'expense_management': '/api/v1/expenses/',
                 'schema': '/api/schema/',
                 'docs': '/api/docs/',
                 'redoc': '/api/redoc/',
@@ -73,6 +74,7 @@ urlpatterns = [
     
     # API v1 - Bounded context URLs
     path('api/v1/users/', include('apps.user_management.presentation.urls')),
+    path('api/v1/expenses/', include('apps.expense_management.presentation.urls')),
 ]
 
 # Add sidecar static files serving for Swagger UI assets in development
