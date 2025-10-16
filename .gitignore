@@ -592,3 +592,4 @@ logs/django.log
 ./venv/*
 /venv/*
 apps/venv/*
+apps/db.sqlite3
