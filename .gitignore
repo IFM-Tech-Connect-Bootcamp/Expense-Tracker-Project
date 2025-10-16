@@ -589,3 +589,6 @@ apps/user_management/*/__pycache__/*
 apps/user_management/*/*/__pycache__/*
 apps/user_management/*/*/*/__pycache__/*
 logs/django.log
+./venv/*
+/venv/*
+apps/venv/*
